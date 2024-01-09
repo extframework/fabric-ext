@@ -4,6 +4,8 @@ import com.durganmcbroom.artifact.resolver.simple.maven.SimpleMavenArtifactReque
 import com.durganmcbroom.artifact.resolver.simple.maven.SimpleMavenDescriptor
 import com.durganmcbroom.artifact.resolver.simple.maven.SimpleMavenRepositorySettings
 import net.yakclient.boot.dependency.DependencyResolverProvider
+import net.yakclient.components.extloader.api.target.ApplicationTarget
+import net.yakclient.integrations.fabric.FabricIntegrationTweaker
 import net.yakclient.integrations.fabric.fabricRepository
 
 internal class FabricLoaderDependencyResolverProvider :
@@ -33,8 +35,15 @@ internal class FabricLoaderDependencyResolverProvider :
                 "asm-util",
                 "gson",
                 "lwjgl",
-//                "logging"
-            )
+            ) + FabricIntegrationTweaker.tweakerEnv[ApplicationTarget]!!.reference.dependencyReferences.map {
+                val path = it.location.path
+
+                val substring = path.substring(
+                    path.lastIndexOf("/") + 1,
+                    path.lastIndexOf(".jar")
+                )
+                substring.substring(0 until substring.lastIndexOf("-"))
+            }
         )
     }
 

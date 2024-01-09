@@ -19,6 +19,7 @@ import net.yakclient.common.util.toUrl
 import net.yakclient.components.extloader.target.TargetLinker
 import net.yakclient.integrations.fabric.FabricIntegrationTweaker
 import java.net.URL
+import java.nio.ByteBuffer
 import java.nio.file.Path
 import java.security.AllPermission
 import java.security.CodeSigner
@@ -50,13 +51,24 @@ class FabricLoaderDependencyGraph :
                     )
                 },
                 parent = IntegratedLoader(
-                    sp = FabricIntegrationTweaker.tweakerEnv[TargetLinker]!!.targetSourceProvider,
+                    sp = object : SourceProvider by FabricIntegrationTweaker.tweakerEnv[TargetLinker]!!.targetSourceProvider {
+                        override fun getSource(name: String): ByteBuffer? {
+                            return null
+                        }
+                    } ,
                     cp = FabricIntegrationTweaker.tweakerEnv[TargetLinker]!!.targetClassProvider,
                     parent = FabricLoaderDependencyGraph::class.java.classLoader
                 )
             ) {
                 override fun findClass(moduleName: String?, name: String): Class<*>? {
                     return findLoadedClass(name)
+                }
+
+                override fun loadClass(name: String?): Class<*> {
+                    if (name == "org.slf4j.Logger") {
+                        println("HERE")
+                    }
+                    return super.loadClass(name)
                 }
 
                 override fun getResource(name: String): URL? {

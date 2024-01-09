@@ -83,7 +83,7 @@ tasks.launch {
     targetNamespace.set("mojang:deobfuscated")
     jvmArgs(
         "-XstartOnFirstThread",
-        "-Xmx2G",
+        "-Xmx3G",
         "-XX:+UnlockExperimentalVMOptions",
         "-XX:+UseG1GC",
         "-XX:G1NewSizePercent=20",

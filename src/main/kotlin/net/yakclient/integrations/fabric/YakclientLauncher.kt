@@ -52,7 +52,7 @@ class YakclientLauncher(
         }
 
         override fun loadClass(name: String): Class<*> {
-           return super.loadClass(name)
+            return super.loadClass(name)
         }
 
         override fun tryDefine(name: String, resolve: Boolean): Class<*>? {
@@ -60,6 +60,9 @@ class YakclientLauncher(
                 "getTransformer"
             ).apply { trySetAccessible() }.invoke(null) as IMixinTransformer
 
+            if (name.endsWith("Logger")) {
+                println("asdf $name")
+            }
             val source = sp.getSource(name)
             return source?.toBytes()?.let {
                 transformer.transformClassBytes(name, name, it)
