@@ -61,7 +61,7 @@ dependencies {
 
     implementation("net.fabricmc:sponge-mixin:0.12.5+mixin.0.8.5")
     implementation("net.yakclient:common-util:1.0-SNAPSHOT")
-    implementation("net.yakclient:boot:1.1-SNAPSHOT")
+    implementation("net.yakclient:boot:2.0-SNAPSHOT")
     implementation("com.durganmcbroom:artifact-resolver:1.0-SNAPSHOT")
     implementation("com.durganmcbroom:artifact-resolver-simple-maven:1.0-SNAPSHOT")
     implementation("org.ow2.asm:asm-commons:9.6")
@@ -141,7 +141,7 @@ yakclient {
             implementation("net.yakclient.components:ext-loader:1.0-SNAPSHOT")
             implementation("net.yakclient:common-util:1.0-SNAPSHOT")
             implementation("net.yakclient:object-container:1.0-SNAPSHOT")
-            implementation("net.yakclient:boot:1.1-SNAPSHOT")
+            implementation("net.yakclient:boot:2.0-SNAPSHOT")
             implementation("net.yakclient:archives:1.1-SNAPSHOT")
             implementation("com.durganmcbroom:jobs:1.0-SNAPSHOT")
             implementation("com.durganmcbroom:artifact-resolver-simple-maven:1.0-SNAPSHOT")
