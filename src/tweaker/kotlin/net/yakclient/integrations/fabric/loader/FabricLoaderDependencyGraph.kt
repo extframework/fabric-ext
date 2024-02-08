@@ -9,9 +9,10 @@ import net.yakclient.archives.ArchiveReference
 import net.yakclient.archives.Archives
 import net.yakclient.archives.ClassLoaderProvider
 import net.yakclient.archives.zip.ZipResolutionResult
+import net.yakclient.boot.archive.ArchiveAccessTree
 import net.yakclient.boot.archive.ArchiveException
 import net.yakclient.boot.archive.ArchiveResolutionProvider
-import net.yakclient.boot.dependency.DependencyNode
+import net.yakclient.boot.dependency.BasicDependencyNode
 import net.yakclient.boot.dependency.DependencyResolver
 import net.yakclient.boot.loader.*
 import net.yakclient.boot.maven.MavenLikeResolver
@@ -19,94 +20,78 @@ import net.yakclient.common.util.toUrl
 import net.yakclient.components.extloader.target.TargetLinker
 import net.yakclient.integrations.fabric.FabricIntegrationTweaker
 import java.net.URL
-import java.nio.ByteBuffer
 import java.nio.file.Path
 import java.security.AllPermission
 import java.security.CodeSigner
 import java.security.CodeSource
 import java.security.ProtectionDomain
 import java.util.*
+import java.util.concurrent.CopyOnWriteArrayList
+import kotlin.collections.ArrayList
 import kotlin.collections.HashSet
-import kotlin.reflect.KClass
 
 class FabricLoaderDependencyGraph :
-    DependencyResolver<SimpleMavenDescriptor, SimpleMavenArtifactRequest, SimpleMavenRepositorySettings, SimpleMavenRepositoryStub, SimpleMavenArtifactMetadata>(
-        object : ArchiveResolutionProvider<ZipResolutionResult> {
-            // Fabric is not used being loaded hierarchically - which is a being thing that yakclient enforces - so
-            // we this resolution provider will load all classes needed to run fabric into a single classloader.
-
+    DependencyResolver<SimpleMavenDescriptor, SimpleMavenArtifactRequest, BasicDependencyNode, SimpleMavenRepositorySettings, SimpleMavenArtifactMetadata>(
+        parentClassLoader = FabricLoaderDependencyGraph::class.java.classLoader,
+        resolutionProvider = object : ArchiveResolutionProvider<ZipResolutionResult> {
             private val nameToUrl = HashMap<String, URL>()
-            val delegateSources = ArrayList<SourceProvider>()
-            private val sources = MutableSourceProvider(delegateSources)
-            private val classes = MutableClassProvider(ArrayList())
-            private val classLoader = object : IntegratedLoader(
-                sp = sources,
-                cp = classes,
-                sd = { name, bb, cl, definer ->
-                    definer.invoke(
-                        name, bb, ProtectionDomain(
-                            CodeSource(nameToUrl[name], arrayOf<CodeSigner>()),
-                            AllPermission().newPermissionCollection()
+
+            init {
+                // Fabric is not used being loaded hierarchically - which is a being thing that yakclient enforces - so
+                // we this resolution provider will load all classes needed to run fabric into a single classloader.
+                val relationship = FabricIntegrationTweaker.tweakerEnv[TargetLinker]!!.targetTarget.relationship
+                FabricIntegrationTweaker.fabricClassloader = object : MutableClassLoader(
+                    name = "Fabric Class loader",
+                    MutableSourceProvider(ArrayList()),
+                    MutableClassProvider(mutableListOf(relationship.classes)),
+                    MutableResourceProvider(mutableListOf(relationship.resources)),
+                    sd = { name, bb, _, definer ->
+                        definer.invoke(
+                            name, bb, ProtectionDomain(
+                                CodeSource(nameToUrl[name], arrayOf<CodeSigner>()),
+                                AllPermission().newPermissionCollection()
+                            )
                         )
-                    )
-                },
-                parent = IntegratedLoader(
-                    sp = object : SourceProvider by FabricIntegrationTweaker.tweakerEnv[TargetLinker]!!.targetSourceProvider {
-                        override fun getSource(name: String): ByteBuffer? {
-                            return null
-                        }
-                    } ,
-                    cp = FabricIntegrationTweaker.tweakerEnv[TargetLinker]!!.targetClassProvider,
+                    },
+                    // Parent class loader to access minecraft through the target linker.
                     parent = FabricLoaderDependencyGraph::class.java.classLoader
-                )
-            ) {
-                override fun findClass(moduleName: String?, name: String): Class<*>? {
-                    return findLoadedClass(name)
-                }
 
-                override fun loadClass(name: String?): Class<*> {
-                    if (name == "org.slf4j.Logger") {
-                        println("HERE")
+//                    IntegratedLoader(
+//                        name = "Fabric Class loader parent",
+//                        resourceProvider = FabricIntegrationTweaker.tweakerEnv[TargetLinker]!!.targetTarget.relationship.resources,
+//                        classProvider = FabricIntegrationTweaker.tweakerEnv[TargetLinker]!!.targetTarget.relationship.classes,
+//                        parent = FabricLoaderDependencyGraph::class.java.classLoader
+//                    )
+                ) {
+                    override fun getResource(name: String): URL? {
+                        if (name == "mappings/mappings.tiny") return FabricIntegrationTweaker.fabricMappingsPath.toUrl()
+
+                        if (FabricIntegrationTweaker.turnOffResources && name.startsWith("net/minecraft")) return null
+                        return super.getResource(name)
                     }
-                    return super.loadClass(name)
                 }
+            }
 
-                override fun getResource(name: String): URL? {
-                    if (name == "mappings/mappings.tiny") return FabricIntegrationTweaker.fabricMappingsPath.toUrl()
-
-//                   if (FabricIntegrationTweaker.turnOffResources && !name.startsWith("org/spongepowered")) return null
-                    if (FabricIntegrationTweaker.turnOffResources && name.startsWith("net/minecraft")) return null
-                    return super.getResource(name)
-                }
-
-                override fun findResources(name: String): Enumeration<URL> {
-                    val enum = Vector<URL>()
-
-                    delegateSources.mapNotNull {
-                        it.getResource(name)
-                    }.forEach {
-                        enum.add(it)
-                    }
-
-                    return enum.elements()
-                }
-            }.also { FabricIntegrationTweaker.fabricClassloader = it }
-
-            private val alreadyHave : MutableSet<String> = HashSet()
+            private val alreadyHave: MutableSet<String> = HashSet()
 
             override suspend fun resolve(
                 resource: Path,
                 classLoader: ClassLoaderProvider<ArchiveReference>,
                 parents: Set<ArchiveHandle>
             ): JobResult<ZipResolutionResult, ArchiveException> {
+                // Load the archive
                 val ref = Archives.find(resource, Archives.Finders.ZIP_FINDER)
+                // Mark it as already being loaded so we don't do that twice
                 alreadyHave.add(resource.toString())
 
-                sources.add(DelegatingSourceProvider(listOf(ArchiveSourceProvider(ref))))
-                classes.add(DelegatingClassProvider(parents
+                // Add sources, classes, and resources
+                FabricIntegrationTweaker.fabricClassloader.addSources(ArchiveSourceProvider(ref))
+                FabricIntegrationTweaker.fabricClassloader.addClasses(DelegatingClassProvider(parents
                     .filterNot { alreadyHave.add(it.toString()) }
                     .map(::ArchiveClassProvider)))
+                FabricIntegrationTweaker.fabricClassloader.addResources(ArchiveResourceProvider(ref))
 
+                // Filter all classes and add it to the nameToUrl Map
                 val url = resource.toUrl()
                 ref.reader.entries()
                     .filter { it.name.endsWith(".class") }
@@ -116,7 +101,7 @@ class FabricLoaderDependencyGraph :
 
                 val result = Archives.resolve(
                     ref,
-                    this.classLoader,
+                    FabricIntegrationTweaker.fabricClassloader,
                     Archives.Resolvers.ZIP_RESOLVER,
                     parents
                 )
@@ -125,9 +110,19 @@ class FabricLoaderDependencyGraph :
             }
         },
     ),
-    MavenLikeResolver<SimpleMavenArtifactRequest, DependencyNode, SimpleMavenRepositorySettings, SimpleMavenRepositoryStub, SimpleMavenArtifactMetadata> {
+    MavenLikeResolver<SimpleMavenArtifactRequest, BasicDependencyNode, SimpleMavenRepositorySettings, SimpleMavenArtifactMetadata> {
     override val factory: RepositoryFactory<SimpleMavenRepositorySettings, SimpleMavenArtifactRequest, *, ArtifactReference<SimpleMavenArtifactMetadata, *>, *> =
         FabricRepositoryFactory
-    override val metadataType: KClass<SimpleMavenArtifactMetadata> = SimpleMavenArtifactMetadata::class
+    override val metadataType: Class<SimpleMavenArtifactMetadata> = SimpleMavenArtifactMetadata::class.java
     override val name: String = "fabric-loader"
+    override fun constructNode(
+        descriptor: SimpleMavenDescriptor,
+        handle: ArchiveHandle?,
+        parents: Set<BasicDependencyNode>,
+        accessTree: ArchiveAccessTree
+    ): BasicDependencyNode {
+        return BasicDependencyNode(
+            descriptor, handle, parents, accessTree, this
+        )
+    }
 }

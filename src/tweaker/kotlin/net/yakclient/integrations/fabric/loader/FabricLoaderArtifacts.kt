@@ -16,6 +16,8 @@ class FabricLoaderMetadataHandler(settings: SimpleMavenRepositorySettings) : Sim
     settings
 ) {
     override fun requestMetadata(desc: SimpleMavenDescriptor): arrow.core.Either<MetadataRequestException, SimpleMavenArtifactMetadata> {
+        // If it's not the fabric loader, resolve it and then add fabric and neoforge as possible repositories because
+        // 9 times out of 10 their poms didn't include that necessary piece of metadata.
         if (!(desc.group == "net.fabricmc" && desc.artifact == "fabric-loader")) return either.eager {
             val metadata = super.requestMetadata(desc).bind()
 
@@ -38,8 +40,12 @@ class FabricLoaderMetadataHandler(settings: SimpleMavenRepositorySettings) : Sim
                 }
             )
         }
+
         //julian podzilni
         return either.eager {
+            // All the dependencies fabric-loader needs, yes i know this is awful, but its
+            // not included in the fabric-loader metadata. Would eventually like to create
+            // a patch repository with this info.
             val dependencies = listOf(
                 "net.fabricmc:mapping-io:0.5.0",
                 "net.fabricmc:sponge-mixin:0.12.5+mixin.0.8.5",
@@ -47,14 +53,13 @@ class FabricLoaderMetadataHandler(settings: SimpleMavenRepositorySettings) : Sim
                 "org.ow2.asm:asm-commons:9.6",
                 "cpw.mods:modlauncher:10.1.9", // for sponge-mixin,
                 "net.minecraft:launchwrapper:1.12",
-                "io.github.llamalad7:mixinextras-fabric:0.3.2"
+//                "io.github.llamalad7:mixinextras-fabric:0.3.2"
             )
 
             val mavenChildInfoList = dependencies.map { dependency ->
                 SimpleMavenChildInfo(
                     SimpleMavenDescriptor.parseDescription(dependency)!!,
                     listOf(
-//                        SimpleMavenRepositoryStub(PomRepository(null, "maven-central", "https://repo1.maven.org/maven2/")),
                         SimpleMavenRepositoryStub(PomRepository(null, "fabric", "https://maven.fabricmc.net/")),
                         SimpleMavenRepositoryStub(
                             PomRepository(

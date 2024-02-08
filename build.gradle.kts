@@ -17,7 +17,6 @@ version = "1.0-SNAPSHOT"
 
 repositories {
     mavenCentral()
-    mavenLocal()
     maven {
         isAllowInsecureProtocol = true
         url = uri("http://maven.yakclient.net/snapshots")
@@ -34,6 +33,8 @@ repositories {
 }
 
 dependencies {
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.3")
+
     implementation("net.fabricmc:tiny-remapper:0.8.2")
     implementation("net.yakclient.components:minecraft-bootstrapper:1.0-SNAPSHOT")
     implementation("net.fabricmc:fabric-loader:0.15.3")
@@ -110,7 +111,6 @@ yakclient {
                         mutableMapOf()
                     )
                 )
-
                 it.dependencies.add(
                     mutableMapOf(
                         "fl-version" to "0.15.3",

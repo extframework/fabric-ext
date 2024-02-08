@@ -17,6 +17,8 @@ import net.yakclient.boot.loader.*
 import net.yakclient.common.util.readInputStream
 import net.yakclient.common.util.toBytes
 import net.yakclient.components.extloader.api.target.ApplicationTarget
+import net.yakclient.components.extloader.target.TargetLinker
+import org.objectweb.asm.tree.ClassNode
 import org.spongepowered.asm.mixin.transformer.IMixinTransformer
 import java.io.File
 import java.io.IOException
@@ -26,49 +28,74 @@ import java.nio.ByteBuffer
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.Paths
+import java.security.ProtectionDomain
 import java.util.*
+import java.util.concurrent.ConcurrentHashMap
 import java.util.jar.Manifest
 import kotlin.collections.ArrayList
+import kotlin.collections.HashMap
 import kotlin.io.path.toPath
 
 
+// TODO document this, im not going to comment on it right now since it also needs alot of cleaning up
 class YakclientLauncher(
     private var envType: EnvType
 ) : FabricLauncherBase() {
     private var development: Boolean = false
 
     protected var properties: Map<String, Any> = HashMap()
-    private val classloader = object : MutableClassLoader(
-        MutableSourceProvider(ArrayList()),
-        MutableClassProvider(ArrayList()),
+    private val classloader = KnotClassLoaderReplacement() //Any // KnotClassloaderInterface
+
+    private class KnotClassLoaderReplacement : MutableClassLoader(
+        name = "Knot Class loader replacement",
+        classes = MutableClassProvider(mutableListOf(FabricIntegrationTweaker.tweakerEnv[TargetLinker]!!.targetTarget.relationship.classes)),
+        resources = MutableResourceProvider(mutableListOf(FabricIntegrationTweaker.tweakerEnv[TargetLinker]!!.targetTarget.relationship.resources)),
         parent = FabricIntegrationTweaker.fabricClassloader
     ) {
-        public fun isClassLoaded(name: String): Boolean {
+        private val classCache: MutableMap<String, Class<*>> = ConcurrentHashMap()
+
+        fun isClassLoaded(name: String): Boolean {
             return findLoadedClass(name) != null
         }
 
-        override fun getResources(name: String?): Enumeration<URL> {
-            return super.getResources(name)
+        override fun loadClass(name: String): Class<*> = classCache[name] ?: synchronized(getClassLoadingLock(name)) {
+            val findLoadedClass = findLoadedClass(name)
+            val c = findLoadedClass
+                ?: classProvider.findClass(name)
+                ?: runCatching { parent.loadClass(name) }.getOrNull()
+                ?: tryDefine(name)
+                ?: throw ClassNotFoundException(name)
+
+            classCache[name] = c
+
+            c
         }
 
-        override fun loadClass(name: String): Class<*> {
-            return super.loadClass(name)
-        }
-
-        override fun tryDefine(name: String, resolve: Boolean): Class<*>? {
+        override fun tryDefine(name: String): Class<*>? {
             val transformer = MixinServiceKnot::class.java.getDeclaredMethod(
                 "getTransformer"
             ).apply { trySetAccessible() }.invoke(null) as IMixinTransformer
 
-            if (name.endsWith("Logger")) {
-                println("asdf $name")
-            }
-            val source = sp.getSource(name)
-            return source?.toBytes()?.let {
+            val source = sourceProvider.findSource(name)
+            val cls = source?.toBytes()?.let {
                 transformer.transformClassBytes(name, name, it)
-            }?.let(ByteBuffer::wrap)?.let { sd.define(name, it, this, ::defineClass) } ?: super.tryDefine(name, resolve)
+            }?.let(ByteBuffer::wrap)?.let {
+                classCache[name] ?: defineClass(name, it, ProtectionDomain(null, null))
+            }
+
+            if (cls != null)
+                classCache[name] = cls
+
+            return cls
         }
-    } //Any // KnotClassloaderInterface
+
+        companion object {
+            init {
+                registerAsParallelCapable()
+            }
+        }
+    }
+
     private val classPath: MutableList<Path> = ArrayList()
     internal lateinit var provider: YakclientGameProvider
     private var unlocked = false
@@ -195,11 +222,9 @@ class YakclientLauncher(
 
         setAllowedPrefixes(path, *allowedPrefixes)
 
-        classloader.addSource(
-            ArchiveSourceProvider(
-                Archives.find(path, Archives.Finders.ZIP_FINDER)
-            )
-        )
+        val archive = Archives.find(path, Archives.Finders.ZIP_FINDER)
+        classloader.addSources(ArchiveSourceProvider(archive))
+        classloader.addResources(ArchiveResourceProvider(archive))
 
 //        classloader::class.java.getDeclaredMethod("addCodeSource", Path::class.java).apply {
 //            trySetAccessible()
@@ -261,7 +286,7 @@ class YakclientLauncher(
             ArchiveSourceProvider(it)
         })
 
-        return references.getSource(name.replace('/', '.'))?.toBytes() ?: classloader.getResourceAsStream(
+        return references.findSource(name.replace('/', '.'))?.toBytes() ?: classloader.getResourceAsStream(
             name.replace(
                 '.',
                 '/'

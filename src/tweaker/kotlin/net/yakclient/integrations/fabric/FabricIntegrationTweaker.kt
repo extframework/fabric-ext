@@ -1,36 +1,28 @@
 package net.yakclient.integrations.fabric
 
+import bootFactories
 import com.durganmcbroom.artifact.resolver.simple.maven.HashType
+import com.durganmcbroom.artifact.resolver.simple.maven.SimpleMavenArtifactRequest
+import com.durganmcbroom.artifact.resolver.simple.maven.SimpleMavenDescriptor
 import com.durganmcbroom.artifact.resolver.simple.maven.SimpleMavenRepositorySettings
 import com.durganmcbroom.artifact.resolver.simple.maven.layout.SimpleMavenDefaultLayout
-import net.yakclient.archives.ArchiveHandle
-import net.yakclient.archives.mixin.BeforeInsnNodeInjector
-import net.yakclient.archives.mixin.MethodSourceInjector
-import net.yakclient.archives.mixin.SourceInjectionContext
-import net.yakclient.archives.mixin.SourceInjectionPoint
-import net.yakclient.boot.container.ContainerHandle
+import kotlinx.coroutines.runBlocking
+import net.yakclient.boot.archive.ArchiveGraph
+import net.yakclient.boot.dependency.DependencyResolverProvider
 import net.yakclient.boot.loader.IntegratedLoader
-import net.yakclient.boot.loader.MutableClassProvider
-import net.yakclient.boot.security.PrivilegeManager
+import net.yakclient.boot.loader.MutableClassLoader
 import net.yakclient.common.util.resolve
 import net.yakclient.components.extloader.api.environment.*
-import net.yakclient.components.extloader.api.extension.ExtensionClassLoaderProvider
-import net.yakclient.components.extloader.api.extension.archive.ExtensionArchiveReference
 import net.yakclient.components.extloader.api.target.ApplicationParentClProvider
 import net.yakclient.components.extloader.api.target.ApplicationTarget
 import net.yakclient.components.extloader.api.target.ExtraClassProviderAttribute
 import net.yakclient.components.extloader.api.tweaker.EnvironmentTweaker
-import net.yakclient.components.extloader.extension.ExtensionClassLoader
-import net.yakclient.components.extloader.extension.ExtensionProcess
 import net.yakclient.components.extloader.target.TargetLinker
+import net.yakclient.integrations.fabric.dependency.FabricModDependencyResolver
+import net.yakclient.integrations.fabric.dependency.FabricModDependencyResolverProvider
 import net.yakclient.integrations.fabric.loader.FabricLoaderDependencyResolverProvider
 import net.yakclient.minecraft.bootstrapper.ExtraClassProvider
-import org.objectweb.asm.tree.LdcInsnNode
-import java.lang.IllegalArgumentException
-import java.net.URL
-import java.nio.file.Files
-import java.util.*
-import kotlin.collections.ArrayList
+import orThrow
 
 val fabricRepository = SimpleMavenRepositorySettings(
     SimpleMavenDefaultLayout(
@@ -43,84 +35,50 @@ val fabricRepository = SimpleMavenRepositorySettings(
 
 class FabricIntegrationTweaker : EnvironmentTweaker {
     override fun tweak(environment: ExtLoaderEnvironment) {
+        // While capturing the environment of a tweaker is not good practice, we do it here.
+        // TODO replace with just capturing environmental variables we need
         tweakerEnv = environment
 
+        // Extra class's for the minecraft bootstrapper, it delegates to the lateinit
+        // property extrasProvider which is in practice just runtime generated mixin
+        // classes/proxies.
         tweakerEnv += object : ExtraClassProviderAttribute {
             override fun getByteArray(name: String): ByteArray? {
                 return extrasProvider?.getByteArray(name)
             }
         }
 
-        val oldLinker = environment[TargetLinker]!!
-        environment += TargetLinker(
-            oldLinker.targetClassProvider,
-            oldLinker.targetSourceProvider,
-            object : MutableClassProvider(ArrayList()) {
-                override fun findClass(name: String): Class<*>? {
-                    return delegateClasses.firstNotNullOfOrNull { it.findClass(name) }
-                }
-            }
-        )
-
-
-
+        // Register the fabric loader dependency type (ONLY FOR THE FABRIC-INTEGRATION EXTENSION)
         val dependencyTypes = environment[dependencyTypesAttrKey]!!.container
         dependencyTypes.register(
             "fabric-loader",
             FabricLoaderDependencyResolverProvider()
         )
 
-        System.setProperty("fabric.skipMcProvider", "true")
-        System.setProperty(
-            "fabric.gameJarPath.client",
-            environment[ApplicationTarget]!!.reference.reference.location.path
+        val fabricModResolver = FabricModDependencyResolverProvider(
+            environment.archiveGraph.path,
+            dependencyTypes.get("simple-maven")!! as DependencyResolverProvider<SimpleMavenDescriptor, SimpleMavenArtifactRequest, SimpleMavenRepositorySettings>,
+        )
+        dependencyTypes.register(
+            "fabric-mod:curse-maven",
+            fabricModResolver
         )
 
+        // Set the minecraft version
         minecraftVersion = environment[ApplicationTarget]!!.reference.descriptor.version
 
-        environment[injectionPointsAttrKey]!!.container.register(
-            "fabric-client-entrypoint-point",
-        ) { context ->
-            val node = (context.insn.find {
-                it is LdcInsnNode && it.cst == "Backend library: {}"
-            } ?: throw IllegalArgumentException("Failed to find appropiate instruction for client entrypoint. "))
-            listOf(BeforeInsnNodeInjector(
-                context.insn,
-                node.previous.previous
-            ))
-        }
 
-        environment += object : ExtensionClassLoaderProvider {
-            override fun createFor(
-                archive: ExtensionArchiveReference,
-                dependencies: List<ArchiveHandle>,
-                manager: PrivilegeManager,
-                handle: ContainerHandle<ExtensionProcess>,
-                linker: TargetLinker,
-                parent: ClassLoader
-            ): ClassLoader = object : ExtensionClassLoader(archive, dependencies, manager, parent, handle, linker) {
-                override fun getResources(name: String?): Enumeration<URL> {
-                    val enum = Vector<URL>()
-                    getResource(name)?.let {
-                        enum.add(it)
-                    }
-                    return enum.elements()
-                }
-            }
-        }
         environment += object : ApplicationParentClProvider {
             override fun getParent(linker: TargetLinker, environment: ExtLoaderEnvironment): ClassLoader {
                 return object : IntegratedLoader(
-                    cp = linker.miscClassProvider,
-                    sp = linker.miscSourceProvider,
+                    name = "FabricExt provided minecraft parent classloader",
+                    classProvider = linker.miscTarget.relationship.classes,
+                    resourceProvider = linker.miscTarget.relationship.resources,
                     parent = environment[ParentClassloaderAttribute]!!.cl
                 ) {
-                    override fun loadClass(name: String, resolve: Boolean): Class<*> {
-                        val it = runCatching { knotClassloader?.loadClass(name) }.getOrNull()
-                            ?: super.loadClass(name, resolve)
-
-                        if (resolve) resolveClass(it)
-                        return it
+                    override fun loadClass(name: String): Class<*> {
+                        return runCatching { knotClassloader?.loadClass(name) }.getOrNull()
+                            ?: super.loadClass(name)
                     }
                 }
             }
@@ -129,22 +87,34 @@ class FabricIntegrationTweaker : EnvironmentTweaker {
 
     companion object {
         // ONLY QUERY
+        // TODO remove
+        @Deprecated("Poor design, replace with needed environment values")
         lateinit var tweakerEnv: ExtLoaderEnvironment
             private set
 
-        lateinit var fabricClassloader : ClassLoader
+        // The class loader that loads fabric and all of its dependencies
+        lateinit var fabricClassloader: MutableClassLoader
             internal set
+
+        // The minecraft version, easy access
         lateinit var minecraftVersion: String
             private set
 
+        // The knot class loader, contains all fabric mods.
         var knotClassloader: ClassLoader? = null
 
+        // The path to where fabrics tiny mappings are. Will be mappings from
+        // intermediary to whatever yakclient is running in.
         val fabricMappingsPath
             get() = tweakerEnv[WorkingDirectoryAttribute]!!.path resolve "mapping" resolve "tiny" resolve "$minecraftVersion.tiny"
 
+        // Whether to turn off access to Minecraft's resource from fabric, this forces
+        // the fabric-loader to get them through yakclient instead.
         var turnOffResources: Boolean = false
 
-        var extrasProvider : ExtraClassProvider? = null
+        // Extra classes provider for minecraft-bootstrapper, usually just
+        // runtime generated mixin classes
+        var extrasProvider: ExtraClassProvider? = null
     }
 }
 

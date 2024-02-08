@@ -10,8 +10,7 @@ import net.yakclient.integrations.fabric.fabricRepository
 
 internal class FabricLoaderDependencyResolverProvider :
     DependencyResolverProvider<SimpleMavenDescriptor, SimpleMavenArtifactRequest, SimpleMavenRepositorySettings> {
-    override val resolver
-        get() = FabricLoaderDependencyGraph()
+    override val resolver = FabricLoaderDependencyGraph()
     override val name: String = "fabric-loader"
     override fun parseRequest(request: Map<String, String>): SimpleMavenArtifactRequest? {
         return SimpleMavenArtifactRequest(
