@@ -1,5 +1,6 @@
 package net.yakclient.integrations.fabric
 
+import com.durganmcbroom.resources.streamToResource
 import net.fabricmc.api.EnvType
 import net.fabricmc.loader.impl.FabricLoaderImpl
 import net.fabricmc.loader.impl.FormattedException
@@ -27,12 +28,8 @@ import net.yakclient.boot.loader.DelegatingSourceProvider
 import net.yakclient.client.api.Extension
 import net.yakclient.common.util.make
 import net.yakclient.common.util.resolve
-import net.yakclient.common.util.resource.ProvidedResource
 import net.yakclient.common.util.toBytes
-import net.yakclient.components.extloader.api.environment.ExtLoaderEnvironment
-import net.yakclient.components.extloader.api.environment.WorkingDirectoryAttribute
-import net.yakclient.components.extloader.api.environment.archiveGraph
-import net.yakclient.components.extloader.api.environment.mappingProvidersAttrKey
+import net.yakclient.components.extloader.api.environment.*
 import net.yakclient.components.extloader.api.target.ApplicationTarget
 import net.yakclient.components.extloader.api.target.ExtraClassProviderAttribute
 import net.yakclient.components.extloader.extension.mapping.MojangExtensionMappingProvider.Companion.REAL_TYPE
@@ -44,9 +41,10 @@ import net.yakclient.integrations.fabric.util.mapNamespaces
 import net.yakclient.integrations.fabric.util.write
 import net.yakclient.minecraft.bootstrapper.MinecraftClassTransformer
 import org.objectweb.asm.ClassReader
-import org.objectweb.asm.tree.*
+import org.objectweb.asm.tree.ClassNode
 import org.spongepowered.asm.mixin.transformer.IMixinTransformer
 import org.spongepowered.asm.util.asm.ASM
+import java.io.ByteArrayInputStream
 import java.io.File
 import java.io.FileWriter
 import java.io.InputStream
@@ -61,9 +59,9 @@ class FabricIntegration : Extension() {
     override fun init() {
         val startTime = System.currentTimeMillis()
 
-        val mappingsProviders = FabricIntegrationTweaker.tweakerEnv[mappingProvidersAttrKey]!!
+        val mappingsProviders = FabricIntegrationTweaker.tweakerEnv[mappingProvidersAttrKey].extract()
         val rawIntermediaryProvider =
-            RawFabricMappingProvider(FabricIntegrationTweaker.tweakerEnv[WorkingDirectoryAttribute]!!.path resolve "mappings" resolve "raw-intermediary")
+            RawFabricMappingProvider(FabricIntegrationTweaker.tweakerEnv[WorkingDirectoryAttribute].extract().path resolve "mappings" resolve "raw-intermediary")
         val intermediaryProvider = FabricMappingProvider(rawIntermediaryProvider)
         mappingsProviders.add(intermediaryProvider)
 
@@ -94,7 +92,7 @@ class FabricIntegration : Extension() {
             trySetAccessible()
         }.set(null, 6)
 
-        val target = FabricIntegrationTweaker.tweakerEnv[ApplicationTarget]!!
+        val target = FabricIntegrationTweaker.tweakerEnv[ApplicationTarget].extract()
         val appRef = target.reference
 
         System.setProperty(
@@ -193,8 +191,8 @@ class FabricIntegration : Extension() {
                 appRef.reference.writer.put(
                     ArchiveReference.Entry(
                         name,
-                        ProvidedResource(
-                            original.resource.uri,
+                        streamToResource(
+                            original.resource.location,
                         ) {
                             // Making sure to use an aware class writer (A Class writer that is able to
                             // load supertypes of a class given its parent archives)
@@ -204,7 +202,7 @@ class FabricIntegration : Extension() {
                             )
                             node.accept(writer)
 
-                            writer.toByteArray()
+                            ByteArrayInputStream(writer.toByteArray())
                         },
                         original.isDirectory,
                         original.handle
@@ -254,7 +252,7 @@ class FabricIntegration : Extension() {
 
                     // Apply the following mixin to each class
                     // TODO figure out a way to only target classes that need a mixin, not literally every single one.
-                    target.mixin(jvmName, object : MinecraftClassTransformer {
+                    target.mixin(jvmName, 10, object : MinecraftClassTransformer {
                         // Extra trees provided by this transformer for minecraft-bootstrapper
                         override val trees: List<ArchiveTree> = trees
 
@@ -328,14 +326,14 @@ class FabricIntegration : Extension() {
         }
 
         // TODO figure out if we need this
-        FabricIntegrationTweaker.tweakerEnv[TargetLinker]!!.addMiscClasses(object : ClassProvider {
+        FabricIntegrationTweaker.tweakerEnv[TargetLinker].extract().addMiscClasses(object : ClassProvider {
             override val packages: Set<String> = setOf()
 
             override fun findClass(name: String): Class<*>? {
                 return runCatching { FabricLauncherBase.getLauncher().targetClassLoader.loadClass(name) }.getOrNull()
             }
         })
-        FabricIntegrationTweaker.knotClassloader = FabricLauncherBase.getLauncher().targetClassLoader
+        FabricIntegrationTweaker.knotClassloader = defer {  FabricLauncherBase.getLauncher().targetClassLoader }
 
         // Turn off resources so mixin generation is forced to go through yakclient
         FabricIntegrationTweaker.turnOffResources = true
@@ -350,7 +348,7 @@ private fun createIntermediaryToOfficialMappings(
     version: String,
 ): ArchiveMapping {
     val graph = newMappingsGraph(
-        env[mappingProvidersAttrKey]!!.toList()
+        env[mappingProvidersAttrKey].extract().toList()
     )
 
     val provider = graph.findShortest(

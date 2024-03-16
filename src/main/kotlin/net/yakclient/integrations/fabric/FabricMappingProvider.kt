@@ -1,5 +1,8 @@
 package net.yakclient.integrations.fabric
 
+import com.durganmcbroom.resources.Resource
+import com.durganmcbroom.resources.openStream
+import com.durganmcbroom.resources.toResource
 import kotlinx.coroutines.runBlocking
 import net.yakclient.archive.mapper.ArchiveMapping
 import net.yakclient.archive.mapper.parsers.proguard.ProGuardMappingParser
@@ -9,7 +12,6 @@ import net.yakclient.boot.store.DataStore
 import net.yakclient.boot.store.DelegatingDataStore
 import net.yakclient.common.util.copyTo
 import net.yakclient.common.util.resolve
-import net.yakclient.common.util.resource.SafeResource
 import net.yakclient.common.util.toResource
 import net.yakclient.components.extloader.api.mapping.MappingsProvider
 import net.yakclient.components.extloader.extension.mapping.MojangExtensionMappingProvider
@@ -41,7 +43,7 @@ class FabricMappingProvider(
 }
 
 internal class RawFabricMappingProvider private constructor(
-    val store: DataStore<String, SafeResource>
+    val store: DataStore<String, Resource>
 ) : MappingsProvider {
 
     public constructor(path: Path) : this(DelegatingDataStore(IntermediaryMappingAccess(path)))
@@ -52,36 +54,28 @@ internal class RawFabricMappingProvider private constructor(
         val mappingData = store[identifier] ?: run {
             val url = URL("https://raw.githubusercontent.com/FabricMC/intermediary/master/mappings/$identifier.tiny")
 
-            object : SafeResource {
-                override val uri: URI = url.toURI()
-
-                override fun open(): InputStream {
-                    return url.openStream()
-                }
-            }
+            url.toResource()
         }
 
-        return TinyV1MappingsParser.parse(mappingData.open())
+        return TinyV1MappingsParser.parse(mappingData.openStream())
     }
 }
 
 private class IntermediaryMappingAccess(
     private val path: Path
-) : DataAccess<String, SafeResource> {
-    override fun read(key: String): SafeResource? {
+) : DataAccess<String, Resource> {
+    override fun read(key: String): Resource? {
         val versionPath = path resolve "client-mappings-$key.json"
 
         if (!versionPath.exists()) return null
 
-        return versionPath.toUri().toResource()
+        return versionPath.toResource()
     }
 
-    override fun write(key: String, value: SafeResource) {
+    override fun write(key: String, value: Resource) {
         val versionPath = path resolve "client-mappings-$key.json"
         versionPath.deleteIfExists()
 
-        runBlocking {
-            value.copyTo(versionPath)
-        }
+        value copyTo versionPath
     }
 }

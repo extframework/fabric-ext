@@ -1,13 +1,13 @@
 package net.yakclient.integrations.fabric
 
-import bootFactories
-import com.durganmcbroom.artifact.resolver.simple.maven.HashType
 import com.durganmcbroom.artifact.resolver.simple.maven.SimpleMavenArtifactRequest
 import com.durganmcbroom.artifact.resolver.simple.maven.SimpleMavenDescriptor
 import com.durganmcbroom.artifact.resolver.simple.maven.SimpleMavenRepositorySettings
 import com.durganmcbroom.artifact.resolver.simple.maven.layout.SimpleMavenDefaultLayout
-import kotlinx.coroutines.runBlocking
-import net.yakclient.boot.archive.ArchiveGraph
+import com.durganmcbroom.jobs.Job
+import com.durganmcbroom.jobs.JobName
+import com.durganmcbroom.jobs.job
+import com.durganmcbroom.resources.ResourceAlgorithm.SHA1
 import net.yakclient.boot.dependency.DependencyResolverProvider
 import net.yakclient.boot.loader.IntegratedLoader
 import net.yakclient.boot.loader.MutableClassLoader
@@ -22,22 +22,19 @@ import net.yakclient.integrations.fabric.dependency.FabricModDependencyResolver
 import net.yakclient.integrations.fabric.dependency.FabricModDependencyResolverProvider
 import net.yakclient.integrations.fabric.loader.FabricLoaderDependencyResolverProvider
 import net.yakclient.minecraft.bootstrapper.ExtraClassProvider
-import orThrow
 
-val fabricRepository = SimpleMavenRepositorySettings(
-    SimpleMavenDefaultLayout(
-        "https://maven.fabricmc.net",
-        HashType.SHA1,
-        true, false
-    ),
-    HashType.SHA1
+val fabricRepository = SimpleMavenRepositorySettings.default(
+    "https://maven.fabricmc.net",
+    releasesEnabled = true, snapshotsEnabled = false
+
 )
 
 class FabricIntegrationTweaker : EnvironmentTweaker {
-    override fun tweak(environment: ExtLoaderEnvironment) {
+    override fun tweak(environment: ExtLoaderEnvironment): Job<Unit> = job(JobName("Tweak the fabric environment")) {
         // While capturing the environment of a tweaker is not good practice, we do it here.
         // TODO replace with just capturing environmental variables we need
         tweakerEnv = environment
+        println("Fabric tweaker ran")
 
         // Extra class's for the minecraft bootstrapper, it delegates to the lateinit
         // property extrasProvider which is in practice just runtime generated mixin
@@ -48,25 +45,30 @@ class FabricIntegrationTweaker : EnvironmentTweaker {
             }
         }
 
-        // Register the fabric loader dependency type (ONLY FOR THE FABRIC-INTEGRATION EXTENSION)
-        val dependencyTypes = environment[dependencyTypesAttrKey]!!.container
-        dependencyTypes.register(
-            "fabric-loader",
-            FabricLoaderDependencyResolverProvider()
-        )
 
-        val fabricModResolver = FabricModDependencyResolverProvider(
-            environment.archiveGraph.path,
-            dependencyTypes.get("simple-maven")!! as DependencyResolverProvider<SimpleMavenDescriptor, SimpleMavenArtifactRequest, SimpleMavenRepositorySettings>,
-        )
-        dependencyTypes.register(
-            "fabric-mod:curse-maven",
-            fabricModResolver
-        )
+
+        // Register the fabric loader dependency type (ONLY FOR THE FABRIC-INTEGRATION EXTENSION)
+        environment.update(dependencyTypesAttrKey) { dependencyTypesContainer ->
+            val dependencyTypes = dependencyTypesContainer.container
+
+            dependencyTypes.register(
+                "fabric-loader",
+                FabricLoaderDependencyResolverProvider()
+            )
+
+            val fabricModResolver = FabricModDependencyResolverProvider(
+                environment.archiveGraph.path,
+                dependencyTypes.get("simple-maven")!! as DependencyResolverProvider<SimpleMavenDescriptor, SimpleMavenArtifactRequest, SimpleMavenRepositorySettings>,
+            )
+            dependencyTypes.register(
+                "fabric-mod:curse-maven",
+                fabricModResolver
+            )
+        }
+
 
         // Set the minecraft version
-        minecraftVersion = environment[ApplicationTarget]!!.reference.descriptor.version
-
+        minecraftVersion = environment[ApplicationTarget].map { it.reference.descriptor.version }.extract()
 
         environment += object : ApplicationParentClProvider {
             override fun getParent(linker: TargetLinker, environment: ExtLoaderEnvironment): ClassLoader {
@@ -74,10 +76,10 @@ class FabricIntegrationTweaker : EnvironmentTweaker {
                     name = "FabricExt provided minecraft parent classloader",
                     classProvider = linker.miscTarget.relationship.classes,
                     resourceProvider = linker.miscTarget.relationship.resources,
-                    parent = environment[ParentClassloaderAttribute]!!.cl
+                    parent = environment[ParentClassloaderAttribute].extract().cl
                 ) {
                     override fun loadClass(name: String): Class<*> {
-                        return runCatching { knotClassloader?.loadClass(name) }.getOrNull()
+                        return runCatching { knotClassloader.getOrNull()?.loadClass(name) }.getOrNull()
                             ?: super.loadClass(name)
                     }
                 }
@@ -101,12 +103,12 @@ class FabricIntegrationTweaker : EnvironmentTweaker {
             private set
 
         // The knot class loader, contains all fabric mods.
-        var knotClassloader: ClassLoader? = null
+        lateinit var knotClassloader: DeferredValue<ClassLoader>
 
         // The path to where fabrics tiny mappings are. Will be mappings from
         // intermediary to whatever yakclient is running in.
         val fabricMappingsPath
-            get() = tweakerEnv[WorkingDirectoryAttribute]!!.path resolve "mapping" resolve "tiny" resolve "$minecraftVersion.tiny"
+            get() = tweakerEnv[WorkingDirectoryAttribute].extract().path resolve "mapping" resolve "tiny" resolve "$minecraftVersion.tiny"
 
         // Whether to turn off access to Minecraft's resource from fabric, this forces
         // the fabric-loader to get them through yakclient instead.

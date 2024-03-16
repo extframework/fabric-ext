@@ -1,5 +1,6 @@
 package net.yakclient.integrations.fabric.util
 
+import com.durganmcbroom.resources.openStream
 import net.yakclient.archives.ArchiveReference
 import net.yakclient.common.util.make
 import java.io.FileOutputStream
@@ -15,7 +16,7 @@ fun ArchiveReference.write(path: Path) {
 
             target.putNextEntry(entry)
 
-            val eIn = e.resource.open()
+            val eIn = e.resource.openStream()
 
             //Stolen from https://stackoverflow.com/questions/1281229/how-to-use-jaroutputstream-to-create-a-jar-file
             val buffer = ByteArray(1024)

@@ -16,6 +16,7 @@ import net.yakclient.archives.Archives
 import net.yakclient.boot.loader.*
 import net.yakclient.common.util.readInputStream
 import net.yakclient.common.util.toBytes
+import net.yakclient.components.extloader.api.environment.extract
 import net.yakclient.components.extloader.api.target.ApplicationTarget
 import net.yakclient.components.extloader.target.TargetLinker
 import org.objectweb.asm.tree.ClassNode
@@ -43,13 +44,13 @@ class YakclientLauncher(
 ) : FabricLauncherBase() {
     private var development: Boolean = false
 
-    protected var properties: Map<String, Any> = HashMap()
+    private var properties: Map<String, Any> = HashMap()
     private val classloader = KnotClassLoaderReplacement() //Any // KnotClassloaderInterface
 
     private class KnotClassLoaderReplacement : MutableClassLoader(
         name = "Knot Class loader replacement",
-        classes = MutableClassProvider(mutableListOf(FabricIntegrationTweaker.tweakerEnv[TargetLinker]!!.targetTarget.relationship.classes)),
-        resources = MutableResourceProvider(mutableListOf(FabricIntegrationTweaker.tweakerEnv[TargetLinker]!!.targetTarget.relationship.resources)),
+        classes = MutableClassProvider(mutableListOf(FabricIntegrationTweaker.tweakerEnv[TargetLinker].extract().targetTarget.relationship.classes)),
+        resources = MutableResourceProvider(mutableListOf(FabricIntegrationTweaker.tweakerEnv[TargetLinker].extract().targetTarget.relationship.resources)),
         parent = FabricIntegrationTweaker.fabricClassloader
     ) {
         private val classCache: MutableMap<String, Class<*>> = ConcurrentHashMap()
@@ -211,7 +212,7 @@ class YakclientLauncher(
     }
 
     override fun getClassPath(): List<Path> {
-        val reference = FabricIntegrationTweaker.tweakerEnv.get(ApplicationTarget)!!.reference
+        val reference = FabricIntegrationTweaker.tweakerEnv.get(ApplicationTarget).extract().reference
         return listOf(reference.reference.location.toPath())
 //        return listOf()
 //        return classPath
@@ -281,7 +282,7 @@ class YakclientLauncher(
     @Throws(IOException::class)
     override fun getClassByteArray(name: String, runTransformers: Boolean): ByteArray? {
         // Can ignore transformation as our game provider doesnt provide that.
-        val targetRef = FabricIntegrationTweaker.tweakerEnv[ApplicationTarget]!!.reference
+        val targetRef = FabricIntegrationTweaker.tweakerEnv[ApplicationTarget].extract().reference
         val references = DelegatingSourceProvider((targetRef.dependencyReferences + targetRef.reference).map {
             ArchiveSourceProvider(it)
         })

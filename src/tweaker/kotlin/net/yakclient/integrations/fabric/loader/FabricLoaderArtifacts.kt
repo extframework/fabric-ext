@@ -1,25 +1,26 @@
 package net.yakclient.integrations.fabric.loader
 
-import arrow.core.continuations.either
-import com.durganmcbroom.artifact.resolver.MetadataRequestException
 import com.durganmcbroom.artifact.resolver.RepositoryFactory
 import com.durganmcbroom.artifact.resolver.simple.maven.*
-import com.durganmcbroom.artifact.resolver.simple.maven.layout.SimpleMavenDefaultLayout
 import com.durganmcbroom.artifact.resolver.simple.maven.pom.PomRepository
+import com.durganmcbroom.jobs.Job
+import com.durganmcbroom.jobs.job
+import com.durganmcbroom.resources.ResourceAlgorithm
+import com.durganmcbroom.resources.VerifiedResource
+import com.durganmcbroom.resources.toResource
 import net.yakclient.common.util.readAsSha1
 import java.net.URI
-
-
+import java.net.URL
 
 
 class FabricLoaderMetadataHandler(settings: SimpleMavenRepositorySettings) : SimpleMavenMetadataHandler(
     settings
 ) {
-    override fun requestMetadata(desc: SimpleMavenDescriptor): arrow.core.Either<MetadataRequestException, SimpleMavenArtifactMetadata> {
+    override fun requestMetadata(desc: SimpleMavenDescriptor): Job<SimpleMavenArtifactMetadata> {
         // If it's not the fabric loader, resolve it and then add fabric and neoforge as possible repositories because
         // 9 times out of 10 their poms didn't include that necessary piece of metadata.
-        if (!(desc.group == "net.fabricmc" && desc.artifact == "fabric-loader")) return either.eager {
-            val metadata = super.requestMetadata(desc).bind()
+        if (!(desc.group == "net.fabricmc" && desc.artifact == "fabric-loader")) return job {
+            val metadata = super.requestMetadata(desc)().merge()
 
             SimpleMavenArtifactMetadata(
                 metadata.descriptor,
@@ -27,13 +28,16 @@ class FabricLoaderMetadataHandler(settings: SimpleMavenRepositorySettings) : Sim
                 metadata.children.map {
                     it.copy(
                         candidates = it.candidates + listOf(
-                            SimpleMavenRepositoryStub(PomRepository(null, "fabric", "https://maven.fabricmc.net/")),
+                            SimpleMavenRepositoryStub(
+                                PomRepository(null, "fabric", "https://maven.fabricmc.net/"),
+                                true
+                            ),
                             SimpleMavenRepositoryStub(
                                 PomRepository(
                                     null,
                                     "neoforge",
                                     "https://maven.neoforged.net/releases"
-                                )
+                                ), true
                             ),
                         )
                     )
@@ -42,7 +46,7 @@ class FabricLoaderMetadataHandler(settings: SimpleMavenRepositorySettings) : Sim
         }
 
         //julian podzilni
-        return either.eager {
+        return job {
             // All the dependencies fabric-loader needs, yes i know this is awful, but its
             // not included in the fabric-loader metadata. Would eventually like to create
             // a patch repository with this info.
@@ -60,21 +64,20 @@ class FabricLoaderMetadataHandler(settings: SimpleMavenRepositorySettings) : Sim
                 SimpleMavenChildInfo(
                     SimpleMavenDescriptor.parseDescription(dependency)!!,
                     listOf(
-                        SimpleMavenRepositoryStub(PomRepository(null, "fabric", "https://maven.fabricmc.net/")),
+                        SimpleMavenRepositoryStub(PomRepository(null, "fabric", "https://maven.fabricmc.net/"), true),
                         SimpleMavenRepositoryStub(
                             PomRepository(
                                 null,
                                 "neoforge",
                                 "https://maven.neoforged.net/releases",
-
-                                )
+                            ), true
                         ),
                         SimpleMavenRepositoryStub(
                             PomRepository(
                                 null,
                                 "minecraft",
                                 "https://libraries.minecraft.net"
-                            )
+                            ), true
                         ),
                     ),
                     "runtime"
@@ -83,9 +86,9 @@ class FabricLoaderMetadataHandler(settings: SimpleMavenRepositorySettings) : Sim
 
             SimpleMavenArtifactMetadata(
                 desc,
-                HashedResource(
-                    "SHA1",
-                    "https://maven.fabricmc.net/net/fabricmc/fabric-loader/${desc.version}/fabric-loader-${desc.version}.jar",
+                VerifiedResource(
+                    URL("https://maven.fabricmc.net/net/fabricmc/fabric-loader/${desc.version}/fabric-loader-${desc.version}.jar").toResource(),
+                    ResourceAlgorithm.SHA1,
                     URI.create("https://maven.fabricmc.net/net/fabricmc/fabric-loader/${desc.version}/fabric-loader-${desc.version}.jar.sha1")
                         .readAsSha1()
                 ),
