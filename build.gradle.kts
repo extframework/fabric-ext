@@ -76,7 +76,6 @@ dependencies {
 
 }
 
-
 tasks.launch {
     targetNamespace.set("mojang:deobfuscated")
     jvmArgs(
@@ -157,8 +156,6 @@ publishing {
         }
     }
     repositories {
-        if (!project.hasProperty("maven-user") || !project.hasProperty("maven-pass")) return@repositories
-
         maven {
             val repo = if (project.findProperty("isSnapshot") == "true") "snapshots" else "releases"
 
@@ -167,8 +164,15 @@ publishing {
             url = uri("http://maven.yakclient.net/$repo")
 
             credentials {
-                username = project.findProperty("maven-user") as String
-                password = project.findProperty("maven-pass") as String
+                val user = project.findProperty("maven.user") as String?
+                if (user == null) System.err.println("Couldnt find maven user")
+                else println("Found maven user: '$user'")
+                username = user
+
+                val userKey = project.findProperty("maven.key") as String?
+                if (user == null) System.err.println("Couldnt find maven key")
+                else println("Found maven key")
+                password = userKey
             }
             authentication {
                 create<BasicAuthentication>("basic")
