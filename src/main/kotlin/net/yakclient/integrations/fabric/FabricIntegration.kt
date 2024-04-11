@@ -15,6 +15,8 @@ import net.fabricmc.mappingio.format.tiny.Tiny1FileWriter
 import net.minecraft.launchwrapper.Launch
 import net.minecraft.launchwrapper.LaunchClassLoader
 import net.yakclient.archive.mapper.ArchiveMapping
+import net.yakclient.archive.mapper.findShortest
+import net.yakclient.archive.mapper.newMappingsGraph
 import net.yakclient.archive.mapper.parsers.tiny.write
 import net.yakclient.archive.mapper.transform.transformArchive
 import net.yakclient.archives.ArchiveReference
@@ -33,8 +35,6 @@ import net.yakclient.components.extloader.api.environment.*
 import net.yakclient.components.extloader.api.target.ApplicationTarget
 import net.yakclient.components.extloader.api.target.ExtraClassProviderAttribute
 import net.yakclient.components.extloader.extension.mapping.MojangExtensionMappingProvider.Companion.REAL_TYPE
-import net.yakclient.components.extloader.mapping.findShortest
-import net.yakclient.components.extloader.mapping.newMappingsGraph
 import net.yakclient.components.extloader.target.TargetLinker
 import net.yakclient.integrations.fabric.dependency.FabricModNode
 import net.yakclient.integrations.fabric.util.mapNamespaces

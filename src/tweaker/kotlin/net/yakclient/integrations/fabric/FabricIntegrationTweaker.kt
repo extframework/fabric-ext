@@ -46,7 +46,6 @@ class FabricIntegrationTweaker : EnvironmentTweaker {
         }
 
 
-
         // Register the fabric loader dependency type (ONLY FOR THE FABRIC-INTEGRATION EXTENSION)
         environment.update(dependencyTypesAttrKey) { dependencyTypesContainer ->
             val dependencyTypes = dependencyTypesContainer.container

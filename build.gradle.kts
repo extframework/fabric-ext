@@ -4,8 +4,7 @@ plugins {
     kotlin("jvm") version "1.9.21"
 
     id("maven-publish")
-    id("net.yakclient") version "1.0.3"
-    kotlin("kapt") version "1.9.20"
+    id("net.yakclient") version "1.1"
 }
 
 tasks.wrapper {
@@ -49,7 +48,6 @@ dependencies {
     }
     implementation("org.jetbrains.kotlin:kotlin-stdlib:1.8.10")
     implementation("net.minecraft:launchwrapper:1.12")
-    implementation(yakclient.tweakerPartition.map { it.sourceSet.output })
 
     implementation("net.fabricmc:sponge-mixin:0.12.5+mixin.0.8.5")
     implementation("net.yakclient.components:ext-loader:1.0-SNAPSHOT")
@@ -64,16 +62,13 @@ dependencies {
     implementation("com.durganmcbroom:artifact-resolver-simple-maven:1.1-SNAPSHOT")
     implementation("org.ow2.asm:asm-commons:9.6")
 
-    implementation("net.yakclient:archive-mapper:1.2-SNAPSHOT")
-    implementation("net.yakclient:archive-mapper-transform:1.2-SNAPSHOT")
-    extensionInclude("net.yakclient:archive-mapper-tiny:1.2-SNAPSHOT")
-    extensionInclude("net.yakclient:archive-mapper-proguard:1.2-SNAPSHOT")
+    implementation("net.yakclient:archive-mapper:1.2.1-SNAPSHOT")
+    implementation("net.yakclient:archive-mapper-transform:1.2.1-SNAPSHOT")
 
 
     testImplementation("net.yakclient.components:ext-loader:1.0-SNAPSHOT")
     testImplementation("net.yakclient:common-util:1.1-SNAPSHOT")
     testImplementation(kotlin("test"))
-
 }
 
 tasks.launch {
@@ -96,49 +91,59 @@ yakclient {
         name = "fabric-ext"
         version = "1.0-SNAPSHOT"
 
-        packagingType = "jar"
-        extensionClass = "net.yakclient.integrations.fabric.FabricIntegration"
+        extensionRepositories {
+            yakclient()
+        }
 
-        mainPartition.update { provider ->
-            provider.map {
-                it.repositories.add(
-                    MutableExtensionRepository(
-                        "fabric-loader",
-                        mutableMapOf()
-                    )
-                )
-                it.dependencies.add(
+        partitions {
+            repositories {
+                yakclient()
+                mavenCentral()
+            }
+            if (type == "main") {
+                dependencies.add(
                     mutableMapOf(
                         "fl-version" to "0.15.3",
                     )
                 )
+                repositories {
+                    add(
+                        MutableExtensionRepository(
+                            "fabric-loader",
+                            mutableMapOf()
+                        )
+                    )
 
-                it
+                }
             }
         }
     }
 
     partitions {
+        tweaker {
+            tweakerClass = "net.yakclient.integrations.fabric.FabricIntegrationTweaker"
+            dependencies {
+                implementation("net.yakclient.components:minecraft-bootstrapper:1.0-SNAPSHOT")
+                implementation("net.yakclient.components:ext-loader:1.0-SNAPSHOT")
+                implementation("net.yakclient:common-util:1.1-SNAPSHOT")
+                implementation("net.yakclient:object-container:1.0-SNAPSHOT")
+                implementation("net.yakclient:boot:2.1-SNAPSHOT")
+                implementation("net.yakclient:archives:1.2-SNAPSHOT")
+                implementation("com.durganmcbroom:jobs:1.2-SNAPSHOT")
+                implementation("com.durganmcbroom:artifact-resolver-simple-maven:1.1-SNAPSHOT")
+                implementation("com.durganmcbroom:artifact-resolver:1.1-SNAPSHOT")
+                implementation("com.fasterxml.jackson.module:jackson-module-kotlin:2.13.4")
+                implementation("net.yakclient:archive-mapper:1.2.1-SNAPSHOT")
+                implementation("net.yakclient:archives-mixin:1.2-SNAPSHOT")
+            }
+        }
 
-
-    }
-
-    tweakerPartition {
-        entrypoint.set("net.yakclient.integrations.fabric.FabricIntegrationTweaker")
-        this.dependencies {
-            implementation("net.yakclient.components:minecraft-bootstrapper:1.0-SNAPSHOT")
-            implementation("net.yakclient.components:ext-loader:1.0-SNAPSHOT")
-            implementation("net.yakclient:common-util:1.1-SNAPSHOT")
-            implementation("net.yakclient:object-container:1.0-SNAPSHOT")
-            implementation("net.yakclient:boot:2.1-SNAPSHOT")
-            implementation("net.yakclient:archives:1.2-SNAPSHOT")
-            implementation("com.durganmcbroom:jobs:1.2-SNAPSHOT")
-            implementation("com.durganmcbroom:artifact-resolver-simple-maven:1.1-SNAPSHOT")
-            implementation("com.durganmcbroom:artifact-resolver:1.1-SNAPSHOT")
-            implementation("com.fasterxml.jackson.module:jackson-module-kotlin:2.13.4")
-            implementation("net.yakclient:archive-mapper:1.2-SNAPSHOT")
-            implementation("net.yakclient:archives-mixin:1.2-SNAPSHOT")
-
+        main {
+            extensionClass = "net.yakclient.integrations.fabric.FabricIntegration"
+            dependencies {
+                implementation("net.yakclient:archive-mapper-tiny:1.2.1-SNAPSHOT")
+                implementation("net.yakclient:archive-mapper-proguard:1.2.1-SNAPSHOT")
+            }
         }
     }
 }
