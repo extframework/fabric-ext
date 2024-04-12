@@ -337,7 +337,7 @@ class FabricIntegration : Extension() {
 
         // Turn off resources so mixin generation is forced to go through yakclient
         FabricIntegrationTweaker.turnOffResources = true
-        Thread.currentThread().contextClassLoader = appRef.handle.classloader
+//   TODO rewrite a new context loader that truly has context     Thread.currentThread().contextClassLoader = appRef.handle.classloader
 
         println("Fabric initialization complete. Total phase took: '${(System.currentTimeMillis() - startTime) / 1000f}' seconds")
     }

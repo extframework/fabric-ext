@@ -14,6 +14,8 @@ tasks.wrapper {
 group = "net.yakclient.integrations"
 version = "1.0-SNAPSHOT"
 
+val fabricLoaderVersion = "0.15.9"
+
 repositories {
     mavenCentral()
     maven {
@@ -29,6 +31,10 @@ repositories {
     maven {
         url = uri("https://libraries.minecraft.net")
     }
+    maven {
+        url = uri("http://localhost:3000")
+        isAllowInsecureProtocol = true
+    }
 }
 
 dependencies {
@@ -36,7 +42,7 @@ dependencies {
 
     implementation("net.fabricmc:tiny-remapper:0.8.2")
     implementation("net.yakclient.components:minecraft-bootstrapper:1.0-SNAPSHOT")
-    implementation("net.fabricmc:fabric-loader:0.15.3")
+    implementation("net.fabricmc:fabric-loader:$fabricLoaderVersion")
     implementation("net.yakclient:client-api:1.0-SNAPSHOT")
 
     implementation("cpw.mods:modlauncher:10.1.9")
@@ -103,7 +109,7 @@ yakclient {
             if (type == "main") {
                 dependencies.add(
                     mutableMapOf(
-                        "fl-version" to "0.15.3",
+                        "fl-version" to fabricLoaderVersion,
                     )
                 )
                 repositories {
@@ -113,7 +119,6 @@ yakclient {
                             mutableMapOf()
                         )
                     )
-
                 }
             }
         }
@@ -184,6 +189,11 @@ publishing {
             }
         }
     }
+}
+
+task<Jar>("sourcesJar") {
+    archiveClassifier.set("sources")
+    from(sourceSets.main.get().allSource)
 }
 
 java {
