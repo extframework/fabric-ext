@@ -1,84 +1,29 @@
-import net.yakclient.gradle.*
+import dev.extframework.gradle.*
+import dev.extframework.gradle.common.*
+import dev.extframework.gradle.common.dm.artifactResolver
+import dev.extframework.gradle.common.dm.jobs
+import dev.extframework.internal.api.extension.ExtensionRepository
 
 plugins {
     kotlin("jvm") version "1.9.21"
 
     id("maven-publish")
-    id("net.yakclient") version "1.1"
+    id("dev.extframework.mc") version "1.2.23"
+    id("dev.extframework.common") version "1.0.37"
 }
 
 tasks.wrapper {
     gradleVersion = "8.6-rc-1"
 }
 
-group = "net.yakclient.integrations"
-version = "1.0-SNAPSHOT"
+group = "dev.extframework.integrations"
+version = "1.0-BETA"
 
-val fabricLoaderVersion = "0.15.9"
-
-repositories {
-    mavenCentral()
-    maven {
-        isAllowInsecureProtocol = true
-        url = uri("http://maven.yakclient.net/snapshots")
-    }
-    maven {
-        url = uri("https://maven.fabricmc.net/")
-    }
-    maven {
-        url = uri("https://maven.neoforged.net/releases")
-    }
-    maven {
-        url = uri("https://libraries.minecraft.net")
-    }
-    maven {
-        url = uri("http://localhost:3000")
-        isAllowInsecureProtocol = true
-    }
-}
-
-dependencies {
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.3")
-
-    implementation("net.fabricmc:tiny-remapper:0.8.2")
-    implementation("net.yakclient.components:minecraft-bootstrapper:1.0-SNAPSHOT")
-    implementation("net.fabricmc:fabric-loader:$fabricLoaderVersion")
-    implementation("net.yakclient:client-api:1.0-SNAPSHOT")
-
-    implementation("cpw.mods:modlauncher:10.1.9")
-    implementation("net.fabricmc:sponge-mixin:0.12.5+mixin.0.8.5") {
-        exclude(group = "org.ow2.asm")
-    }
-    implementation("net.fabricmc:mapping-io:0.5.0") {
-        isTransitive = false
-    }
-    implementation("org.jetbrains.kotlin:kotlin-stdlib:1.8.10")
-    implementation("net.minecraft:launchwrapper:1.12")
-
-    implementation("net.fabricmc:sponge-mixin:0.12.5+mixin.0.8.5")
-    implementation("net.yakclient.components:ext-loader:1.0-SNAPSHOT")
-
-
-    implementation("net.yakclient:archives:1.2-SNAPSHOT")
-
-    implementation("net.fabricmc:sponge-mixin:0.12.5+mixin.0.8.5")
-    implementation("net.yakclient:common-util:1.1-SNAPSHOT")
-    implementation("net.yakclient:boot:2.1-SNAPSHOT")
-    implementation("com.durganmcbroom:artifact-resolver:1.1-SNAPSHOT")
-    implementation("com.durganmcbroom:artifact-resolver-simple-maven:1.1-SNAPSHOT")
-    implementation("org.ow2.asm:asm-commons:9.6")
-
-    implementation("net.yakclient:archive-mapper:1.2.1-SNAPSHOT")
-    implementation("net.yakclient:archive-mapper-transform:1.2.1-SNAPSHOT")
-
-
-    testImplementation("net.yakclient.components:ext-loader:1.0-SNAPSHOT")
-    testImplementation("net.yakclient:common-util:1.1-SNAPSHOT")
-    testImplementation(kotlin("test"))
-}
+val fabricLoaderVersion = "0.16.9"
 
 tasks.launch {
     targetNamespace.set("mojang:deobfuscated")
+    mcVersion.set("1.21.3")
     jvmArgs(
         "-XstartOnFirstThread",
         "-Xmx3G",
@@ -91,102 +36,106 @@ tasks.launch {
     )
 }
 
-yakclient {
-    model {
-        groupId = "net.yakclient.integrations"
-        name = "fabric-ext"
-        version = "1.0-SNAPSHOT"
+repositories {
+    mavenLocal()
+    mavenCentral()
+    extframework()
+    maven {
+        url = uri("https://maven.fabricmc.net/")
+    }
+    maven {
+        url = uri("https://maven.neoforged.net/releases")
+    }
+    maven {
+        url = uri("https://libraries.minecraft.net")
+    }
+    maven {
+        url = uri("https://repo.extframework.dev/registry")
+    }
+}
 
-        extensionRepositories {
-            yakclient()
-        }
+dependencies {
+    implementation("io.github.llamalad7:mixinextras-fabric:0.4.1")
+    implementation(kotlin("stdlib"))
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.3")
 
-        partitions {
-            repositories {
-                yakclient()
-                mavenCentral()
-            }
-            if (type == "main") {
-                dependencies.add(
-                    mutableMapOf(
-                        "fl-version" to fabricLoaderVersion,
-                    )
-                )
-                repositories {
-                    add(
-                        MutableExtensionRepository(
-                            "fabric-loader",
-                            mutableMapOf()
-                        )
-                    )
-                }
-            }
-        }
+    archives()
+    commonUtil()
+    boot()
+    artifactResolver(maven = true)
+    archiveMapper(transform = true, tiny = true)
+    toolingApi()
+    extLoader(version = "2.1.10-SNAPSHOT")
+
+    implementation("net.fabricmc:tiny-remapper:0.8.2")
+    implementation("net.fabricmc:fabric-loader:$fabricLoaderVersion")
+    implementation("cpw.mods:modlauncher:10.1.9")
+    implementation("net.fabricmc:sponge-mixin:0.12.5+mixin.0.8.5") {
+        exclude(group = "org.ow2.asm")
+    }
+    implementation("net.fabricmc:mapping-io:0.5.0") {
+        isTransitive = false
     }
 
+    implementation("org.ow2.asm:asm-commons:9.6")
+
+    testImplementation(kotlin("test"))
+}
+
+extension {
     partitions {
         tweaker {
-            tweakerClass = "net.yakclient.integrations.fabric.FabricIntegrationTweaker"
+            tweakerClass = "dev.extframework.integrations.fabric.FabricIntegrationTweaker"
             dependencies {
-                implementation("net.yakclient.components:minecraft-bootstrapper:1.0-SNAPSHOT")
-                implementation("net.yakclient.components:ext-loader:1.0-SNAPSHOT")
-                implementation("net.yakclient:common-util:1.1-SNAPSHOT")
-                implementation("net.yakclient:object-container:1.0-SNAPSHOT")
-                implementation("net.yakclient:boot:2.1-SNAPSHOT")
-                implementation("net.yakclient:archives:1.2-SNAPSHOT")
-                implementation("com.durganmcbroom:jobs:1.2-SNAPSHOT")
-                implementation("com.durganmcbroom:artifact-resolver-simple-maven:1.1-SNAPSHOT")
-                implementation("com.durganmcbroom:artifact-resolver:1.1-SNAPSHOT")
+                commonUtil()
+                objectContainer()
+                boot()
+                archives(mixin = true)
+                jobs()
+                artifactResolver(maven = true)
+                archiveMapper()
+                toolingApi()
+                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.3")
+
                 implementation("com.fasterxml.jackson.module:jackson-module-kotlin:2.13.4")
-                implementation("net.yakclient:archive-mapper:1.2.1-SNAPSHOT")
-                implementation("net.yakclient:archives-mixin:1.2-SNAPSHOT")
             }
         }
 
         main {
-            extensionClass = "net.yakclient.integrations.fabric.FabricIntegration"
+            model {
+                dependencies.addAll(
+                    mutableMapOf(
+                        "fl-version" to fabricLoaderVersion,
+                    ),
+                )
+
+                repositories.addAll(
+                    ExtensionRepository(
+                        "fl",
+                        mutableMapOf()
+                    )
+                )
+            }
+            extensionClass = "dev.extframework.integrations.fabric.FabricIntegration"
             dependencies {
-                implementation("net.yakclient:archive-mapper-tiny:1.2.1-SNAPSHOT")
-                implementation("net.yakclient:archive-mapper-proguard:1.2.1-SNAPSHOT")
+                coreApi()
+                archiveMapper(tiny = true, proguard = true)
+                implementation("net.minecraft:launchwrapper:1.12")
             }
         }
     }
 }
 
-publishing {
-    publications {
-        create<MavenPublication>("prod") {
+common {
+    publishing {
+        publication {
             artifact(tasks.jar)
             artifact(tasks.generateErm) {
                 classifier = "erm"
             }
 
-            groupId = "net.yakclient.integrations"
+            groupId = "dev.extframework.integrations"
             artifactId = "fabric-ext"
-        }
-    }
-    repositories {
-        maven {
-            val repo = if (project.findProperty("isSnapshot") == "true") "snapshots" else "releases"
-
-            isAllowInsecureProtocol = true
-
-            url = uri("http://maven.yakclient.net/$repo")
-
-            credentials {
-                val user = project.findProperty("maven.user") as String?
-                if (user == null) System.err.println("Couldnt find maven user")
-                else println("Found maven user: '$user'")
-                username = user
-
-                val userKey = project.findProperty("maven.key") as String?
-                if (user == null) System.err.println("Couldnt find maven key")
-                else println("Found maven key")
-                password = userKey
-            }
-            authentication {
-                create<BasicAuthentication>("basic")
-            }
         }
     }
 }
@@ -194,12 +143,17 @@ publishing {
 task<Jar>("sourcesJar") {
     archiveClassifier.set("sources")
     from(sourceSets.main.get().allSource)
+    from(sourceSets.named("tweaker").map { it.allSource })
 }
 
 java {
     toolchain {
-        languageVersion.set(JavaLanguageVersion.of(17))
+        languageVersion.set(JavaLanguageVersion.of(21))
     }
+}
+
+kotlin {
+    jvmToolchain(21)
 }
 
 tasks.test {
