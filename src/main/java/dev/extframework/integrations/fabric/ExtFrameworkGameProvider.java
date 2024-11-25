@@ -63,13 +63,6 @@ public class ExtFrameworkGameProvider implements GameProvider {
         }
     };
 
-//       private final GameTransformer a =     new GameTransformer(
-//            new EntrypointPatch(this),
-//            new BrandingPatch(),
-//            new EntrypointPatchFML125(),
-////            new TinyFDPatch()
-//    );
-
     @Override
     public String getGameId() {
         return "minecraft";
@@ -276,46 +269,6 @@ public class ExtFrameworkGameProvider implements GameProvider {
     public void initialize(FabricLauncher launcher) {
         launcher.setValidParentClassPath(validParentClassPath);
 
-//        if (true) {
-//            Map<String, Path> obfJars = new HashMap<>(3);
-//            String[] names = new String[gameJars.size()];
-//
-//            for (int i = 0; i < gameJars.size(); i++) {
-//                String name;
-//
-//                if (i == 0) {
-//                    name = envType.name().toLowerCase(Locale.ENGLISH);
-//                } else if (i == 1) {
-//                    name = "common";
-//                } else {
-//                    name = String.format(Locale.ENGLISH, "extra-%d", i - 2);
-//                }
-//
-//                obfJars.put(name, gameJars.get(i));
-//                names[i] = name;
-//            }
-//
-//            if (realmsJar != null) {
-//                obfJars.put("realms", realmsJar);
-//            }
-//
-//            obfJars = GameProviderHelper.deobfuscate(obfJars,
-//                    getGameId(), getNormalizedGameVersion(),
-//                    getLaunchDirectory(),
-//                    launcher);
-//
-//            System.exit(0);
-//
-//            for (int i = 0; i < gameJars.size(); i++) {
-//                Path newJar = obfJars.get(names[i]);
-//                Path oldJar = gameJars.set(i, newJar);
-//
-//                if (logJars.remove(oldJar)) logJars.add(newJar);
-//            }
-//
-//            realmsJar = obfJars.get("realms");
-//        }
-
         // Load the logger libraries on the platform CL when in a unit test
         if (!logJars.isEmpty() && !Boolean.getBoolean(SystemProperties.UNIT_TEST)) {
             for (Path jar : logJars) {
@@ -417,44 +370,12 @@ public class ExtFrameworkGameProvider implements GameProvider {
 
     @Override
     public void unlockClassPath(FabricLauncher launcher) {
-//        for (Path gameJar : gameJars) {
-//            if (logJars.contains(gameJar)) {
-//                launcher.setAllowedPrefixes(gameJar);
-//            } else {
-//                launcher.addToClassPath(gameJar);
-//            }
-//        }
-//
-//        if (realmsJar != null) launcher.addToClassPath(realmsJar);
-//
-//        for (Path lib : miscGameLibraries) {
-//            launcher.addToClassPath(lib);
-//        }
+
     }
 
     @Override
     public void launch(ClassLoader loader) {
-        System.out.println("Hey");
-//        String targetClass = entrypoint;
-//
-//        if (envType == EnvType.CLIENT && targetClass.contains("Applet")) {
-//            targetClass = "net.fabricmc.loader.impl.game.minecraft.applet.AppletMain";
-//        }
-//
-//        MethodHandle invoker;
-//
-//        try {
-//            Class<?> c = loader.loadClass(targetClass);
-//            invoker = MethodHandles.lookup().findStatic(c, "main", MethodType.methodType(void.class, String[].class));
-//        } catch (NoSuchMethodException | IllegalAccessException | ClassNotFoundException e) {
-//            throw FormattedException.ofLocalized("exception.minecraft.invokeFailure", e);
-//        }
-//
-//        try {
-//            invoker.invokeExact(arguments.toArray());
-//        } catch (Throwable t) {
-//            throw FormattedException.ofLocalized("exception.minecraft.generic", t);
-//        }
+
     }
 
 }
