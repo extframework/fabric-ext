@@ -2,7 +2,9 @@ import dev.extframework.gradle.*
 import dev.extframework.gradle.common.*
 import dev.extframework.gradle.common.dm.artifactResolver
 import dev.extframework.gradle.common.dm.jobs
+import dev.extframework.gradle.publish.ExtensionPublication
 import dev.extframework.internal.api.extension.ExtensionRepository
+import kotlin.jvm.java
 
 plugins {
     kotlin("jvm") version "1.9.21"
@@ -124,26 +126,26 @@ extension {
             }
         }
     }
-}
 
-common {
-    publishing {
-        publication {
-            artifact(tasks.jar)
-            artifact(tasks.generateErm) {
-                classifier = "erm"
-            }
-
-            groupId = "dev.extframework.integrations"
-            artifactId = "fabric-ext"
-        }
+    metadata {
+        name = "Fabric Integration"
+        description = "An extension that brings the fabric ecosystem to extframework"
+        developers.add("extframework")
     }
 }
 
-task<Jar>("sourcesJar") {
-    archiveClassifier.set("sources")
-    from(sourceSets.main.get().allSource)
-    from(sourceSets.named("tweaker").map { it.allSource })
+publishing {
+    publications {
+        create("prod", ExtensionPublication::class.java)
+    }
+    repositories {
+        maven {
+            url = uri("https://repo.extframework.dev")
+            credentials {
+                password = properties["creds.ext.key"] as? String
+            }
+        }
+    }
 }
 
 java {
