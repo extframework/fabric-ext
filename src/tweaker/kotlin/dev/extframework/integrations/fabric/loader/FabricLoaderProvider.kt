@@ -16,32 +16,6 @@ internal class FabricLoaderDependencyResolverProvider :
                 request["fl-version"]!!
             )
         )
-//
-//        return SimpleMavenArtifactRequest(
-//            SimpleMavenDescriptor(
-//                "net.fabricmc",
-//                "fabric-loader",
-//                request["fl-version"] ?: return null,
-//                null
-//            ),
-//            includeScopes = setOf("compile", "runtime", "import"),
-//            excludeArtifacts = setOf(
-//                "jackson-databind",
-//                "jackson-core",
-//                "jackson-dataformat-xml",
-//                "log4j-api",
-//                "jackson-dataformat-yaml",
-//                "asm",
-//                "asm-debug-all",
-//                "asm-analysis",
-//                "asm-tree",
-//                "asm-util",
-//                "gson",
-//                "lwjgl",
-//            ) + FabricIntegrationTweaker.tweakerEnv[ApplicationTarget].extract().node.access.targets.mapNotNull {
-//                (it.descriptor as? SimpleMavenDescriptor)?.name
-//            }
-//        )
     }
 
     override fun parseSettings(settings: Map<String, String>): SimpleMavenRepositorySettings? {

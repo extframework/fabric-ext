@@ -10,6 +10,7 @@ import dev.extframework.boot.dependency.DependencyResolverProvider
 import dev.extframework.boot.loader.MutableClassLoader
 import dev.extframework.common.util.resolve
 import dev.extframework.extension.core.environment.mixinAgentsAttrKey
+import dev.extframework.extension.core.minecraft.environment.mappingTargetAttrKey
 import dev.extframework.integrations.fabric.dependency.CurseMavenFabricModProvider
 import dev.extframework.integrations.fabric.dependency.ModrinthFabricModProvider
 import dev.extframework.integrations.fabric.loader.FabricLoaderDependencyResolverProvider
@@ -31,48 +32,34 @@ class FabricIntegrationTweaker : EnvironmentTweaker {
         // TODO replace with just capturing environmental variables we need
         tweakerEnv = environment
 
-        // Extra class's for the minecraft bootstrapper, it delegates to the lateinit
-        // property extrasProvider which is in practice just runtime generated mixin
-        // classes/proxies.
-//        tweakerEnv
-
-//        = object : ExtraClassProviderAttribute {
-//            override fun getByteArray(name: String): ByteArray? {
-//                return extrasProvider?.getByteArray(name)
-//            }
-//        }
-
         // Register the fabric loader dependency type (ONLY FOR THE FABRIC-INTEGRATION EXTENSION)
-        environment.update(dependencyTypesAttrKey) { dependencyTypesContainer ->
-            val dependencyTypes = dependencyTypesContainer.container
+        val dependencyTypes = environment[dependencyTypesAttrKey].extract().container
 
-            val flDepProvider = FabricLoaderDependencyResolverProvider()
-            dependencyTypes.register(
-                "fl",
-                flDepProvider
+        val flDepProvider = FabricLoaderDependencyResolverProvider()
+        dependencyTypes.register(
+            "fl",
+            flDepProvider
+        )
+        environment.archiveGraph.registerResolver(flDepProvider.resolver.libResolver)
+
+        dependencyTypes.register(
+            "fabric-mod:curse-maven",
+            CurseMavenFabricModProvider(
+                dependencyTypes.get("simple-maven")!! as DependencyResolverProvider<SimpleMavenDescriptor, SimpleMavenArtifactRequest, SimpleMavenRepositorySettings>,
             )
-            environment.archiveGraph.registerResolver(flDepProvider.resolver.libResolver)
+        )
 
-            dependencyTypes.register(
-                "fabric-mod:curse-maven",
-                CurseMavenFabricModProvider(
-                    dependencyTypes.get("simple-maven")!! as DependencyResolverProvider<SimpleMavenDescriptor, SimpleMavenArtifactRequest, SimpleMavenRepositorySettings>,
-                )
-            )
-
-            dependencyTypes.register(
-                "fabric-mod:modrinth",
-                ModrinthFabricModProvider()
-            )
-
-            dependencyTypesContainer
-        }
+        dependencyTypes.register(
+            "fabric-mod:modrinth",
+            ModrinthFabricModProvider()
+        )
 
         // Set the minecraft version
         minecraftVersion = environment[ApplicationTarget].map { it.node.descriptor.version }.extract()
 
         // TODO Not a good solution right now, but we just need something basic.
-        minecraftPath = environment[wrkDirAttrKey].extract().value resolve environment[ApplicationTarget].extract().path //"minecraft/$minecraftVersion/minecraft-$minecraftVersion-minecraft.jar"
+        minecraftPath =
+            environment[wrkDirAttrKey].extract().value resolve environment[ApplicationTarget].extract().path //"minecraft/$minecraftVersion/minecraft-$minecraftVersion-minecraft.jar"
 
         environment[mixinAgentsAttrKey].extract().add(
             EntrypointMixinAgent().also {
@@ -84,21 +71,6 @@ class FabricIntegrationTweaker : EnvironmentTweaker {
                 spongeMixinAgent = it
             }
         )
-//        environment[TargetLinker].extract().addExtensionClasses(
-//            object : ClassProvider {
-//                override val packages: Set<String>
-//
-//                override fun findClass(name: String): Class<*>? {
-//                    TODO("Not yet implemented")
-//                }
-//            }
-//        )
-
-//        environment += object : ApplicationParentClProvider {
-//            override fun getParent(linker: TargetLinker, environment: ExtLoaderEnvironment): ClassLoader {
-//                return FabricEnabledTargetParentLoader(linker, environment)
-//            }
-//        }
     }
 
 
@@ -123,13 +95,13 @@ class FabricIntegrationTweaker : EnvironmentTweaker {
         // The path to where fabrics tiny mappings are. Will be mappings from
         // intermediary to whatever extframework is running in.
         val fabricMappingsPath
-            get() = tweakerEnv[wrkDirAttrKey].extract().value resolve "mappings" resolve "tiny" resolve "$minecraftVersion.tiny"
+            get() = tweakerEnv[wrkDirAttrKey].extract().value resolve "mappings" resolve "tiny" resolve tweakerEnv[mappingTargetAttrKey].extract().value.path resolve "$minecraftVersion.tiny"
 
         // Whether to turn off access to Minecraft's resource from fabric, this forces
         // the fabric-loader to get them through extframework instead.
         var turnOffResources: Boolean = false
 
-        lateinit var minecraftPath : Path
+        lateinit var minecraftPath: Path
             private set
 
         lateinit var entrypointAgent: EntrypointMixinAgent

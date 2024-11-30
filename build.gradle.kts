@@ -10,7 +10,7 @@ plugins {
     kotlin("jvm") version "1.9.21"
 
     id("maven-publish")
-    id("dev.extframework.mc") version "1.2.23"
+    id("dev.extframework.mc") version "1.2.24"
     id("dev.extframework.common") version "1.0.37"
 }
 
@@ -19,12 +19,12 @@ tasks.wrapper {
 }
 
 group = "dev.extframework.integrations"
-version = "1.0-BETA"
+version = "1.0.1-BETA"
 
 val fabricLoaderVersion = "0.16.9"
 
 tasks.launch {
-    targetNamespace.set("mojang:deobfuscated")
+    targetNamespace.set("mojang:obfuscated")
     mcVersion.set("1.21.3")
     jvmArgs(
         "-XstartOnFirstThread",
@@ -85,6 +85,9 @@ dependencies {
 }
 
 extension {
+//    extensions {
+//        require("dev.extframework.extension:core-mc:1.0.15-BETA")
+//    }
     partitions {
         tweaker {
             tweakerClass = "dev.extframework.integrations.fabric.FabricIntegrationTweaker"
@@ -109,9 +112,17 @@ extension {
                     mutableMapOf(
                         "fl-version" to fabricLoaderVersion,
                     ),
+                    mutableMapOf(
+                        "projectId" to "YL57xq9U",
+                        "versionId" to "qyGMuaY6"
+                    )
                 )
 
                 repositories.addAll(
+                    ExtensionRepository(
+                        "fabric-mod:modrinth",
+                        mutableMapOf()
+                    ),
                     ExtensionRepository(
                         "fl",
                         mutableMapOf()

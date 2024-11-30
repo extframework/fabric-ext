@@ -65,7 +65,7 @@ class FabricIntegration : Extension() {
             val intermediaryToOfficialMappings = createIntermediaryToOfficialMappings(
                 FabricIntegrationTweaker.tweakerEnv, FabricIntegrationTweaker.minecraftVersion,
             ).mapNamespaces(
-                "mojang:deobfuscated" to "named",
+                FabricIntegrationTweaker.tweakerEnv[mappingTargetAttrKey].extract().value.identifier to "named",
                 FabricMappingProvider.INTERMEDIARY_NAMESPACE to "intermediary"
             )
 
@@ -325,7 +325,7 @@ private fun createIntermediaryToOfficialMappings(
 
     val provider = graph.findShortest(
         "fabric:intermediary",
-        "mojang:deobfuscated"
+        env[mappingTargetAttrKey].extract().value.identifier
     )
 
     return provider.forIdentifier(version)
