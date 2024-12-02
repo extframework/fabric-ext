@@ -35,17 +35,24 @@ import java.util.jar.Manifest
 
 
 class ExtFrameworkLauncher(
-    private var envType: EnvType
+    private var envType: EnvType,
+    private var development: Boolean// = false
 ) : FabricLauncherBase() {
-    private var development: Boolean = false
-
     private var properties: Map<String, Any> = HashMap()
     private val classloader = KnotClassLoaderReplacement() //Any // KnotClassloaderInterface
 
     private class KnotClassLoaderReplacement : MutableClassLoader(
         name = "Knot Classloader replacement",
         classes = MutableClassProvider(mutableListOf(ArchiveClassProvider(classLoaderToArchive(FabricIntegrationTweaker.tweakerEnv[TargetLinker].extract().targetLoader)))),
-        resources = MutableResourceProvider(mutableListOf(ArchiveResourceProvider(classLoaderToArchive(FabricIntegrationTweaker.tweakerEnv[TargetLinker].extract().targetLoader)))),
+        resources = MutableResourceProvider(
+            mutableListOf(
+                ArchiveResourceProvider(
+                    classLoaderToArchive(
+                        FabricIntegrationTweaker.tweakerEnv[TargetLinker].extract().targetLoader
+                    )
+                )
+            )
+        ),
         parent = FabricIntegrationTweaker.fabricClassloader
     ) {
         private val classCache: MutableMap<String, Class<*>> = ConcurrentHashMap()
@@ -146,14 +153,17 @@ class ExtFrameworkLauncher(
 
         val loader = FabricLoaderImpl.INSTANCE
         loader.gameProvider = provider
+
         development = true
         loader.load()
-        development = false
+//        development = false
         loader.freeze()
 
-        FabricLoaderImpl.INSTANCE.loadAccessWideners()
+        // TODO It would be a good idea to fix this so that access wideners actually work instead of just
+        //   opening everything and running in deobfuscated
+//        FabricLoaderImpl.INSTANCE.loadAccessWideners()
 
-        development = true
+//        development = true
         FabricMixinBootstrap.init(environmentType, loader)
         development = false
         finishMixinBootstrapping()
@@ -179,7 +189,7 @@ class ExtFrameworkLauncher(
     }
 
     override fun getTargetNamespace(): String {
-        return "named" // hacky
+        return  "named"
     }
 
     override fun getClassPath(): List<Path> {
@@ -197,7 +207,9 @@ class ExtFrameworkLauncher(
         classloader.addResources(ArchiveResourceProvider(archive))
     }
 
+
     override fun setAllowedPrefixes(path: Path, vararg prefixes: String) {
+        //
     }
 
     override fun setValidParentClassPath(paths: Collection<Path>) {

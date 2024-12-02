@@ -14,6 +14,7 @@ import dev.extframework.extension.core.minecraft.environment.mappingTargetAttrKe
 import dev.extframework.integrations.fabric.dependency.CurseMavenFabricModProvider
 import dev.extframework.integrations.fabric.dependency.ModrinthFabricModProvider
 import dev.extframework.integrations.fabric.loader.FabricLoaderDependencyResolverProvider
+import dev.extframework.integrations.fabric.mixin.AccessWidenerMixinAgent
 import dev.extframework.integrations.fabric.mixin.EntrypointMixinAgent
 import dev.extframework.integrations.fabric.mixin.SpongeMixinAgent
 import dev.extframework.tooling.api.environment.*
@@ -61,18 +62,22 @@ class FabricIntegrationTweaker : EnvironmentTweaker {
         minecraftPath =
             environment[wrkDirAttrKey].extract().value resolve environment[ApplicationTarget].extract().path //"minecraft/$minecraftVersion/minecraft-$minecraftVersion-minecraft.jar"
 
-        environment[mixinAgentsAttrKey].extract().add(
+        val mixinAgents by environment[mixinAgentsAttrKey]
+
+        mixinAgents.add(
             EntrypointMixinAgent().also {
                 entrypointAgent = it
             }
         )
-        environment[mixinAgentsAttrKey].extract().add(
+        mixinAgents.add(
             SpongeMixinAgent().also {
                 spongeMixinAgent = it
             }
         )
+        mixinAgents.add(
+            AccessWidenerMixinAgent()
+        )
     }
-
 
     companion object {
         // ONLY QUERY
@@ -109,10 +114,6 @@ class FabricIntegrationTweaker : EnvironmentTweaker {
 
         lateinit var spongeMixinAgent: SpongeMixinAgent
             private set
-
-        // Extra classes provider for minecraft-bootstrapper, usually just
-        // runtime generated mixin classes
-//        var extrasProvider: ExtraClassProvider? = null
     }
 }
 

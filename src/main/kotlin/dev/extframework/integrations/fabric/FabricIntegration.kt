@@ -17,6 +17,7 @@ import dev.extframework.common.util.make
 import dev.extframework.common.util.readInputStream
 import dev.extframework.common.util.resolve
 import dev.extframework.core.api.Extension
+import dev.extframework.extension.core.minecraft.environment.MappingNamespace
 import dev.extframework.extension.core.minecraft.environment.mappingProvidersAttrKey
 import dev.extframework.extension.core.minecraft.environment.mappingTargetAttrKey
 import dev.extframework.extension.core.target.TargetLinker
@@ -61,11 +62,12 @@ class FabricIntegration : Extension() {
         val intermediaryProvider = FabricMappingProvider(rawIntermediaryProvider)
         mappingsProviders.add(intermediaryProvider)
 
+        val mappingTarget = FabricIntegrationTweaker.tweakerEnv[mappingTargetAttrKey].extract().value
         if (FabricIntegrationTweaker.fabricMappingsPath.make()) {
             val intermediaryToOfficialMappings = createIntermediaryToOfficialMappings(
                 FabricIntegrationTweaker.tweakerEnv, FabricIntegrationTweaker.minecraftVersion,
             ).mapNamespaces(
-                FabricIntegrationTweaker.tweakerEnv[mappingTargetAttrKey].extract().value.identifier to "named",
+                mappingTarget.identifier to "named",
                 FabricMappingProvider.INTERMEDIARY_NAMESPACE to "intermediary"
             )
 
@@ -113,10 +115,8 @@ class FabricIntegration : Extension() {
             targetLocation.toString()
         )
 
-        val mappingTargetNS = FabricIntegrationTweaker.tweakerEnv[mappingTargetAttrKey].extract().value
-
         val mappedTarget = FabricIntegrationTweaker.tweakerEnv[wrkDirAttrKey].extract()
-            .value resolve "remapped" resolve "minecraft" resolve "intermediary" resolve mappingTargetNS.path resolve "minecraft-${FabricIntegrationTweaker.minecraftVersion}.jar" //Files.createTempFile("mc-target", ".jar")
+            .value resolve "remapped" resolve "minecraft" resolve "intermediary" resolve mappingTarget.path resolve "minecraft-${FabricIntegrationTweaker.minecraftVersion}.jar" //Files.createTempFile("mc-target", ".jar")
 
         if (!mappedTarget.exists()) {
             // Loading the target (minecraft) and then transforming it from official to intermediary mappings
@@ -126,7 +126,7 @@ class FabricIntegration : Extension() {
             // At this point the target archive should already be in the correctly mapped namespace
             val mappings = newMappingsGraph(mappingsProviders).findShortest(
                 FabricMappingProvider.INTERMEDIARY_NAMESPACE,
-                mappingTargetNS.identifier,
+                mappingTarget.identifier,
             ).forIdentifier(target.node.descriptor.version)
 
             transformArchive(
@@ -138,7 +138,7 @@ class FabricIntegration : Extension() {
                     .filterIsInstance<ClassLoadedArchiveNode<*>>()
                     .mapNotNullTo(ArrayList(), ClassLoadedArchiveNode<*>::handle),
                 mappings,
-                mappingTargetNS.identifier,
+                mappingTarget.identifier,
                 FabricMappingProvider.INTERMEDIARY_NAMESPACE
             )
 
@@ -160,7 +160,7 @@ class FabricIntegration : Extension() {
 
         try {
             // Create the extframework launcher
-            val launcher = ExtFrameworkLauncher(EnvType.CLIENT)
+            val launcher = ExtFrameworkLauncher(EnvType.CLIENT, mappingTarget != MappingNamespace("mojang", "obfuscated"))
 
             // Start the launcher
             launcher.init(arrayOf())

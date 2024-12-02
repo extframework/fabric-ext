@@ -2,6 +2,7 @@ import dev.extframework.gradle.*
 import dev.extframework.gradle.common.*
 import dev.extframework.gradle.common.dm.artifactResolver
 import dev.extframework.gradle.common.dm.jobs
+import dev.extframework.gradle.deobf.MinecraftMappings
 import dev.extframework.gradle.publish.ExtensionPublication
 import dev.extframework.internal.api.extension.ExtensionRepository
 import kotlin.jvm.java
@@ -24,7 +25,7 @@ version = "1.0.1-BETA"
 val fabricLoaderVersion = "0.16.9"
 
 tasks.launch {
-    targetNamespace.set("mojang:obfuscated")
+    targetNamespace.set("mojang:deobfuscated")
     mcVersion.set("1.21.3")
     jvmArgs(
         "-XstartOnFirstThread",
@@ -112,17 +113,9 @@ extension {
                     mutableMapOf(
                         "fl-version" to fabricLoaderVersion,
                     ),
-                    mutableMapOf(
-                        "projectId" to "YL57xq9U",
-                        "versionId" to "qyGMuaY6"
-                    )
                 )
 
                 repositories.addAll(
-                    ExtensionRepository(
-                        "fabric-mod:modrinth",
-                        mutableMapOf()
-                    ),
                     ExtensionRepository(
                         "fl",
                         mutableMapOf()

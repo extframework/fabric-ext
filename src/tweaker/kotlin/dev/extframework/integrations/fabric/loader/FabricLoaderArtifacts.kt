@@ -72,6 +72,7 @@ class FLArtifactRepository(override val settings: SimpleMavenRepositorySettings)
     override fun get(request: FLArtifactRequest): Job<FLArtifactMetadata> {
         val desc by request::descriptor
 
+        // julian podzilni
         return job {
             val installerMetadataResource =
                 settings.layout.resourceOf("net.fabricmc", "fabric-loader", desc.version, null, "json")().merge()
