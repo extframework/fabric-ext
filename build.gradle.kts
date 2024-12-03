@@ -4,7 +4,7 @@ import dev.extframework.gradle.common.dm.artifactResolver
 import dev.extframework.gradle.common.dm.jobs
 import dev.extframework.gradle.deobf.MinecraftMappings
 import dev.extframework.gradle.publish.ExtensionPublication
-import dev.extframework.internal.api.extension.ExtensionRepository
+import dev.extframework.tooling.api.extension.ExtensionRepository
 import kotlin.jvm.java
 
 plugins {
@@ -40,7 +40,6 @@ tasks.launch {
 }
 
 repositories {
-    mavenLocal()
     mavenCentral()
     extframework()
     maven {
@@ -68,7 +67,7 @@ dependencies {
     artifactResolver(maven = true)
     archiveMapper(transform = true, tiny = true)
     toolingApi()
-    extLoader(version = "2.1.10-SNAPSHOT")
+    extLoader()
 
     implementation("net.fabricmc:tiny-remapper:0.8.2")
     implementation("net.fabricmc:fabric-loader:$fabricLoaderVersion")
@@ -86,9 +85,6 @@ dependencies {
 }
 
 extension {
-//    extensions {
-//        require("dev.extframework.extension:core-mc:1.0.15-BETA")
-//    }
     partitions {
         tweaker {
             tweakerClass = "dev.extframework.integrations.fabric.FabricIntegrationTweaker"

@@ -1,6 +1,5 @@
 package dev.extframework.integrations.fabric.dependency
 
-import com.durganmcbroom.artifact.resolver.ArtifactException
 import com.durganmcbroom.artifact.resolver.ArtifactMetadata
 import com.durganmcbroom.artifact.resolver.ArtifactMetadata.Descriptor
 import com.durganmcbroom.artifact.resolver.ArtifactRepository
@@ -28,7 +27,6 @@ import com.fasterxml.jackson.module.kotlin.readValue
 import dev.extframework.archives.ArchiveHandle
 import dev.extframework.boot.archive.ArchiveAccessTree
 import dev.extframework.boot.archive.ArchiveData
-import dev.extframework.boot.archive.ArchiveException
 import dev.extframework.boot.archive.ArchiveTrace
 import dev.extframework.boot.archive.CachedArchiveResource
 import dev.extframework.boot.archive.ResolutionHelper
