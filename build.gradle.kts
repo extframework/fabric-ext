@@ -11,7 +11,7 @@ plugins {
     kotlin("jvm") version "1.9.21"
 
     id("maven-publish")
-    id("dev.extframework.mc") version "1.2.24"
+    id("dev.extframework.mc") version "1.2.25"
     id("dev.extframework.common") version "1.0.37"
 }
 
@@ -100,6 +100,7 @@ extension {
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.3")
 
                 implementation("com.fasterxml.jackson.module:jackson-module-kotlin:2.13.4")
+                implementation(fileTree("build-ext/extensions"))
             }
         }
 
