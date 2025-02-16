@@ -3,6 +3,8 @@ package dev.extframework.integrations.fabric.loader
 import com.durganmcbroom.artifact.resolver.*
 import com.durganmcbroom.artifact.resolver.simple.maven.*
 import com.durganmcbroom.jobs.Job
+import com.durganmcbroom.jobs.async.AsyncJob
+import com.durganmcbroom.jobs.async.asyncJob
 import com.durganmcbroom.jobs.job
 import com.durganmcbroom.resources.*
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties
@@ -69,18 +71,18 @@ class FLArtifactRepository(override val settings: SimpleMavenRepositorySettings)
         KotlinModule.Builder().build()
     )
 
-    override fun get(request: FLArtifactRequest): Job<FLArtifactMetadata> {
+    override fun get(request: FLArtifactRequest): AsyncJob<FLArtifactMetadata> {
         val desc by request::descriptor
 
         // julian podzilni
-        return job {
+        return asyncJob() {
             val installerMetadataResource =
-                settings.layout.resourceOf("net.fabricmc", "fabric-loader", desc.version, null, "json")().merge()
-            val installerMetadata = mapper.readValue<FabricInstallerMetadata>(installerMetadataResource.openStream())
+                settings.layout.resourceOf("net.fabricmc", "fabric-loader", desc.version, null, "json")
+            val installerMetadata = mapper.readValue<FabricInstallerMetadata>(installerMetadataResource.open().toByteArray())
 
             FLArtifactMetadata(
                 desc,
-                settings.layout.resourceOf("net.fabricmc", "fabric-loader", desc.version, null, "jar")().merge(),
+                settings.layout.resourceOf("net.fabricmc", "fabric-loader", desc.version, null, "jar"),
                 installerMetadata
             )
         }
@@ -121,7 +123,7 @@ class FLLibArtifactRepository :
     override val settings: FLLibRepositorySettings = FLLibRepositorySettings
 
 
-    override fun get(request: FLLibArtifactRequest): Job<FLLibArtifactMetadata> = job {
+    override fun get(request: FLLibArtifactRequest): AsyncJob<FLLibArtifactMetadata> = asyncJob {
         val repository = SimpleMavenRepositorySettings.default(url = request.lib.url)
 
         val descriptor = SimpleMavenDescriptor.parseDescription(request.lib.name)!!
@@ -132,7 +134,7 @@ class FLLibArtifactRepository :
             descriptor.version,
             null,
             "jar"
-        )().merge()
+        )
 
         FLLibArtifactMetadata(
             request.descriptor,

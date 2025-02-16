@@ -12,6 +12,7 @@ import dev.extframework.integrations.fabric.FabricIntegrationTweaker
 import dev.extframework.tooling.api.environment.getOrNull
 import java.nio.file.Files
 import java.nio.file.Path
+import kotlin.io.path.outputStream
 
 //abstract class FabricModDescriptor : ArtifactMetadata.Descriptor
 
@@ -54,7 +55,7 @@ private fun fabricJarToPackages(
                 it.name.removePrefix("META-INF/jars/").removeSuffix(".jar"),
                 "jar"
             )
-            it.resource copyTo tmp
+            it.open().copyTo(tmp.outputStream())
             fabricJarToPackages(Archives.find(tmp, Archives.Finders.ZIP_FINDER))
         }
 }

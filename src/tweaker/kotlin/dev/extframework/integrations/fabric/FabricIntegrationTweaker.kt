@@ -9,16 +9,17 @@ import com.durganmcbroom.jobs.job
 import dev.extframework.boot.dependency.DependencyResolverProvider
 import dev.extframework.boot.loader.MutableClassLoader
 import dev.extframework.common.util.resolve
-import dev.extframework.extension.core.environment.mixinAgentsAttrKey
-import dev.extframework.extension.core.minecraft.environment.mappingTargetAttrKey
+import dev.extframework.core.app.api.ApplicationTarget
+import dev.extframework.core.instrument.InstrumentedApplicationTarget
+import dev.extframework.core.instrument.instrumentAgentsAttrKey
+import dev.extframework.core.minecraft.api.MinecraftAppApi
+import dev.extframework.core.minecraft.environment.mappingTargetAttrKey
 import dev.extframework.integrations.fabric.dependency.CurseMavenFabricModProvider
 import dev.extframework.integrations.fabric.dependency.ModrinthFabricModProvider
 import dev.extframework.integrations.fabric.loader.FabricLoaderDependencyResolverProvider
-import dev.extframework.integrations.fabric.mixin.AccessWidenerMixinAgent
 import dev.extframework.integrations.fabric.mixin.EntrypointMixinAgent
 import dev.extframework.integrations.fabric.mixin.SpongeMixinAgent
 import dev.extframework.tooling.api.environment.*
-import dev.extframework.tooling.api.target.ApplicationTarget
 import dev.extframework.tooling.api.tweaker.EnvironmentTweaker
 import java.nio.file.Path
 
@@ -58,12 +59,8 @@ class FabricIntegrationTweaker : EnvironmentTweaker {
         // Set the minecraft version
         minecraftVersion = environment[ApplicationTarget].map { it.node.descriptor.version }.extract()
 
-        // TODO Not a good solution right now, but we just need something basic.
-        minecraftPath =
-            environment[wrkDirAttrKey].extract().value resolve environment[ApplicationTarget].extract().path //"minecraft/$minecraftVersion/minecraft-$minecraftVersion-minecraft.jar"
-
-        val mixinAgents by environment[mixinAgentsAttrKey]
-
+        val mixinAgents by environment[instrumentAgentsAttrKey]
+//
         mixinAgents.add(
             EntrypointMixinAgent().also {
                 entrypointAgent = it
@@ -73,9 +70,6 @@ class FabricIntegrationTweaker : EnvironmentTweaker {
             SpongeMixinAgent().also {
                 spongeMixinAgent = it
             }
-        )
-        mixinAgents.add(
-            AccessWidenerMixinAgent()
         )
     }
 
@@ -106,8 +100,9 @@ class FabricIntegrationTweaker : EnvironmentTweaker {
         // the fabric-loader to get them through extframework instead.
         var turnOffResources: Boolean = false
 
-        lateinit var minecraftPath: Path
-            private set
+        val minecraftPath: Path by lazy {
+            (((tweakerEnv[ApplicationTarget].extract() as InstrumentedApplicationTarget).delegate) as MinecraftAppApi).gameJar
+        }
 
         lateinit var entrypointAgent: EntrypointMixinAgent
             private set

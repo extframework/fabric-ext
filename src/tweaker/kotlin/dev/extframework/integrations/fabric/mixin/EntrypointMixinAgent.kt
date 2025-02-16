@@ -1,10 +1,9 @@
 package dev.extframework.integrations.fabric.mixin
 
-import dev.extframework.extension.core.mixin.MixinAgent
-import dev.extframework.extension.core.util.withDots
+import dev.extframework.core.instrument.InstrumentAgent
 import org.objectweb.asm.tree.ClassNode
 
-class EntrypointMixinAgent : MixinAgent {
+class EntrypointMixinAgent : InstrumentAgent {
     private val patches: MutableMap<String, ClassNode> = HashMap()
 
     fun registerPatches(
@@ -12,12 +11,13 @@ class EntrypointMixinAgent : MixinAgent {
     ) {
        this.patches.putAll(
            patches.associateBy {
-               it.name.withDots()
+               it.name.replace('/', '.')
            }
        )
     }
 
     override fun transformClass(name: String, node: ClassNode?): ClassNode? {
+//        return ode
         return patches[name] ?: node
     }
 }

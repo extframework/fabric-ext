@@ -26,10 +26,11 @@ import dev.extframework.boot.util.mapOfNonNullValues
 import dev.extframework.boot.util.requireKeyInDescriptor
 import dev.extframework.common.util.resolve
 import dev.extframework.common.util.toUrl
-import dev.extframework.extension.core.target.TargetLinker
+import dev.extframework.core.app.TargetLinker
 import dev.extframework.integrations.fabric.FabricIntegrationTweaker
 import dev.extframework.tooling.api.environment.getOrNull
 import kotlinx.coroutines.awaitAll
+import net.fabricmc.loader.impl.util.FileSystemUtil
 import java.io.File
 import java.net.URL
 import java.nio.file.Path
@@ -63,6 +64,7 @@ class FLDependencyResolver private constructor(
     override val name: String = "fl"
     internal val libResolver = FLLibDependencyResolver(resolutionProvider)
     override val apiVersion: Int = 2
+    override val context: ResolutionContext<SimpleMavenRepositorySettings, FLArtifactRequest, FLArtifactMetadata> = FabricRepositoryFactory.createContext()
 
     override fun deserializeDescriptor(descriptor: Map<String, String>, trace: ArchiveTrace): Result<FLDescriptor> =
         result {
@@ -71,7 +73,7 @@ class FLDependencyResolver private constructor(
             )
         }
 
-    override fun FLArtifactMetadata.resource(): Resource? {
+    override suspend fun FLArtifactMetadata.resource(): Resource? {
         return jar
     }
 
@@ -85,15 +87,14 @@ class FLDependencyResolver private constructor(
 
     constructor() : this(FabricResolutionProvider())
 
-    override fun createContext(settings: SimpleMavenRepositorySettings): ResolutionContext<SimpleMavenRepositorySettings, FLArtifactRequest, FLArtifactMetadata> {
-        return FabricRepositoryFactory.createContext(settings)
-    }
-
     override fun cache(
         artifact: Artifact<FLArtifactMetadata>,
         helper: CacheHelper<FLDescriptor>
     ): AsyncJob<Tree<Tagged<IArchive<*>, ArchiveNodeResolver<*, *, *, *, *>>>> = asyncJob {
-        helper.withResource("jar.jar", artifact.metadata.resource())
+        helper.withResource(
+            "jar.jar",
+            artifact.metadata.resource()
+        )
 
         val libs = artifact.metadata.metadata.libraries
         val dependencies = (libs.common + libs.client + libs.development)
@@ -137,8 +138,10 @@ class FLLibDependencyResolver(
     override val metadataType: Class<FLLibArtifactMetadata> = FLLibArtifactMetadata::class.java
     override val name: String = "fllib"
     override val apiVersion: Int = 2
+    override val context: ResolutionContext<FLLibRepositorySettings, FLLibArtifactRequest, FLLibArtifactMetadata>
+      = FLLibRepositoryFactory.createContext()
 
-    override fun FLLibArtifactMetadata.resource(): Resource {
+    override suspend fun FLLibArtifactMetadata.resource(): Resource {
         return jar
     }
 
@@ -173,10 +176,6 @@ class FLLibDependencyResolver(
             "version" to descriptor.version,
             "classifier" to descriptor.classifier
         )
-    }
-
-    override fun createContext(settings: FLLibRepositorySettings): ResolutionContext<FLLibRepositorySettings, FLLibArtifactRequest, FLLibArtifactMetadata> {
-        return FLLibRepositoryFactory.createContext(settings)
     }
 
     override fun constructNode(
@@ -216,6 +215,55 @@ private class FabricResolutionProvider : ArchiveResolutionProvider<ZipResolution
     ): Job<ZipResolutionResult> {
         // Load the archive
         val ref = Archives.find(resource, Archives.Finders.ZIP_FINDER)
+
+
+        /*
+        START SECTION COMMENT
+
+
+        Ok im going to try to explain why we do the following. For whatever reason, the jar
+        file system in java is not natively thread safe. This means that when opening and closing
+        the same jar file system repeatedly across multiple threads there will be instances
+        in which already closed file system will be returned when they are meant to be open,
+        or open file systems will be closed without the consumers' knowledge. I think this is defined
+        and expected behavior inside of java, but fabric-loader does not account for this properly
+        and ONLY during remapping (in which mods are asynchronously remapped) this occurs and creates
+        a race condition in which a ClosedFileSystemException is thrown. This was actually documented
+        and fixed in loom, but not the fml itself (see issue #633 in FabricMC/fabric-loom on GH).
+
+        At the end (after adding all file systems to a list) we run through and close them all.
+        */
+
+        val fsUtilName = FileSystemUtil::class.java.name.replace('.', '/') + ".class"
+        if (ref.reader.contains(fsUtilName)) {
+            ref.writer.put(
+                ArchiveReference.Entry(
+                    fsUtilName,
+                    false,
+                    ref
+                ) {
+                    FileSystemUtil::class.java.getResourceAsStream("/$fsUtilName")
+                }
+            )
+        }
+
+        val fsUtilDelegateName = FileSystemUtil.FileSystemDelegate::class.java.name.replace('.', '/') + ".class"
+        if (ref.reader.contains(fsUtilDelegateName)) {
+            ref.writer.put(
+                ArchiveReference.Entry(
+                    fsUtilDelegateName,
+                    false,
+                    ref
+                ) {
+                    FileSystemUtil::class.java.getResourceAsStream("/$fsUtilDelegateName")
+                }
+            )
+        }
+
+        /*
+        END SECTION COMMENT
+         */
+
         // Mark it as already being loaded so we don't do that twice
         alreadyHave.add(resource.toString())
 
@@ -273,14 +321,15 @@ private class FabricClassLoader(
             )
         }
     },
-    MutableResourceProvider(mutableListOf(
-        object : ResourceProvider {
-            override fun findResources(name: String): Sequence<URL> =
-                FabricIntegrationTweaker.tweakerEnv[TargetLinker].getOrNull()?.targetLoader?.getResources(
-                    name
-                )?.asSequence() ?: sequenceOf()
-        }
-    )),
+    MutableResourceProvider(
+        mutableListOf(
+            object : ResourceProvider {
+                override fun findResources(name: String): Sequence<URL> =
+                    FabricIntegrationTweaker.tweakerEnv[TargetLinker].getOrNull()?.targetLoader?.getResources(
+                        name
+                    )?.asSequence() ?: sequenceOf()
+            }
+        )),
     sd = { name, bb, _, definer ->
         definer.invoke(
             name, bb, ProtectionDomain(

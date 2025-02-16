@@ -74,15 +74,14 @@ internal class CurseMavenFabricModDependencyResolver(
     parentClassLoader
 ), MavenLikeResolver<FabricModNode<SimpleMavenDescriptor>, SimpleMavenArtifactMetadata> {
     override val nodeType = typeOf<FabricModNode<SimpleMavenDescriptor>>()
-    override fun SimpleMavenArtifactMetadata.resource(): Resource? {
-        return resource
+
+    override suspend fun SimpleMavenArtifactMetadata.resource(): Resource? {
+        return resource()
     }
 
+    override val context: ResolutionContext<SimpleMavenRepositorySettings, SimpleMavenArtifactRequest, SimpleMavenArtifactMetadata> = SimpleMaven.createContext()
     override val metadataType: Class<SimpleMavenArtifactMetadata> = SimpleMavenArtifactMetadata::class.java
     override val name: String = "curse-fabric-mod"
-    override fun createContext(settings: SimpleMavenRepositorySettings): ResolutionContext<SimpleMavenRepositorySettings, SimpleMavenArtifactRequest, SimpleMavenArtifactMetadata> {
-        return SimpleMaven.createContext(settings)
-    }
 
     override fun cache(
         artifact: Artifact<SimpleMavenArtifactMetadata>,

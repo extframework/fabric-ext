@@ -10,6 +10,8 @@ import com.durganmcbroom.artifact.resolver.RepositorySettings
 import com.durganmcbroom.artifact.resolver.ResolutionContext
 import com.durganmcbroom.artifact.resolver.createContext
 import com.durganmcbroom.jobs.Job
+import com.durganmcbroom.jobs.async.AsyncJob
+import com.durganmcbroom.jobs.async.asyncJob
 import com.durganmcbroom.jobs.job
 import com.durganmcbroom.jobs.mapException
 import com.durganmcbroom.jobs.result
@@ -17,7 +19,7 @@ import com.durganmcbroom.resources.Resource
 import com.durganmcbroom.resources.ResourceAlgorithm
 import com.durganmcbroom.resources.ResourceNotFoundException
 import com.durganmcbroom.resources.VerifiedResource
-import com.durganmcbroom.resources.openStream
+import com.durganmcbroom.resources.toByteArray
 import com.durganmcbroom.resources.toResource
 import com.fasterxml.jackson.databind.DeserializationFeature
 import com.fasterxml.jackson.databind.PropertyNamingStrategies
@@ -35,6 +37,7 @@ import dev.extframework.boot.dependency.DependencyResolver
 import dev.extframework.boot.dependency.DependencyResolverProvider
 import dev.extframework.boot.util.requireKeyInDescriptor
 import dev.extframework.common.util.Hex
+import dev.extframework.common.util.runCatching
 import dev.extframework.integrations.fabric.FabricIntegrationTweaker
 import java.net.URI
 import java.net.URLEncoder
@@ -128,11 +131,11 @@ class ModrinthArtifactRepository :
         return URLEncoder.encode(str, "UTF-8")
     }
 
-    override fun get(request: ModrinthModArtifactRequest): Job<ModrinthModArtifactMetadata> = job {
-        val version = mapper.readValue<ModrinthProjectVersion>(result {
+    override fun get(request: ModrinthModArtifactRequest): AsyncJob<ModrinthModArtifactMetadata> = asyncJob() {
+        val version = mapper.readValue<ModrinthProjectVersion>(runCatching {
             URI.create(
                 MODRINTH_VERSION_ENDPOINT + request.descriptor.versionId
-            ).toURL().toResource().openStream()
+            ).toURL().toResource().open().toByteArray()
         }.mapException {
             if (it is ResourceNotFoundException) {
                 MetadataRequestException.MetadataNotFound(
@@ -166,7 +169,7 @@ class ModrinthArtifactRepository :
                             "https://api.modrinth.com/v2/project/${it.projectId}/version?" +
                                     "loaders=${encoded("[\"fabric\"]")}" +
                                     "&game_versions=${encoded("[\"${FabricIntegrationTweaker.minecraftVersion}\"]")}",
-                        ).toURL().toResource().openStream()
+                        ).toURL().toResource().open().toByteArray()
 
                     val response = mapper.readValue<List<ModrinthProjectVersionListing>>(versionsResponse)
 
@@ -211,16 +214,14 @@ class ModrinthFabricModDependencyResolver(
         throw UnsupportedOperationException()
     }
 
-    override fun ModrinthModArtifactMetadata.resource(): Resource? {
+    override suspend fun ModrinthModArtifactMetadata.resource(): Resource? {
         return resource
     }
 
+    override val context: ResolutionContext<ModrinthRepositorySettings, ModrinthModArtifactRequest, ModrinthModArtifactMetadata> =Modrinth.createContext()
+
     override val metadataType: Class<ModrinthModArtifactMetadata> = ModrinthModArtifactMetadata::class.java
     override val name: String = "modrinth-fabric-mod"
-
-    override fun createContext(settings: ModrinthRepositorySettings): ResolutionContext<ModrinthRepositorySettings, ModrinthModArtifactRequest, ModrinthModArtifactMetadata> {
-        return Modrinth.createContext(settings)
-    }
 
     override fun load(
         data: ArchiveData<ModrinthModDescriptor, CachedArchiveResource>,

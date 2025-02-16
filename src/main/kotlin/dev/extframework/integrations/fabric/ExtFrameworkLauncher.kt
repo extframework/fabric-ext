@@ -5,10 +5,9 @@ import dev.extframework.archives.zip.classLoaderToArchive
 import dev.extframework.boot.loader.*
 import dev.extframework.common.util.readInputStream
 import dev.extframework.common.util.toBytes
-import dev.extframework.extension.core.target.TargetLinker
-import dev.extframework.extension.core.util.withSlashes
+import dev.extframework.core.app.TargetLinker
+import dev.extframework.core.app.api.ApplicationTarget
 import dev.extframework.tooling.api.environment.extract
-import dev.extframework.tooling.api.target.ApplicationTarget
 import net.fabricmc.api.EnvType
 import net.fabricmc.loader.api.FabricLoader
 import net.fabricmc.loader.api.entrypoint.PreLaunchEntrypoint
@@ -241,7 +240,7 @@ class ExtFrameworkLauncher(
         // Can ignore transformation as our game provider doesnt provide that.
 
         val targetRef = FabricIntegrationTweaker.tweakerEnv[ApplicationTarget].extract().node.handle?.classloader
-            ?.getResource(name.withSlashes() + ".class")?.readBytes()
+            ?.getResource(name.replace('.', '/') + ".class")?.readBytes()
 
         return targetRef ?: classloader.getResourceAsStream(
             name.replace(

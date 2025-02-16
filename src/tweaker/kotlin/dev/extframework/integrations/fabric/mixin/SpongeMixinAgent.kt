@@ -1,9 +1,9 @@
 package dev.extframework.integrations.fabric.mixin
 
-import dev.extframework.extension.core.mixin.MixinAgent
+import dev.extframework.core.instrument.InstrumentAgent
 import org.objectweb.asm.tree.ClassNode
 
-class SpongeMixinAgent : MixinAgent {
+class SpongeMixinAgent : InstrumentAgent {
     var delegateAgent: ((name: String, node: ClassNode?) -> ClassNode?)? = null
 
     override fun transformClass(name: String, node: ClassNode?): ClassNode? {

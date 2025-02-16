@@ -1,4 +1,4 @@
-package dev.extframework.integrations.fabric.util
+package dev.extframework.integrations.fabric.mapping
 
 import dev.extframework.archive.mapper.*
 import dev.extframework.common.util.LazyMap

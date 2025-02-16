@@ -16,19 +16,19 @@ import dev.extframework.boot.loader.ClassProvider
 import dev.extframework.common.util.make
 import dev.extframework.common.util.readInputStream
 import dev.extframework.common.util.resolve
-import dev.extframework.core.api.Extension
-import dev.extframework.extension.core.minecraft.environment.MappingNamespace
-import dev.extframework.extension.core.minecraft.environment.mappingProvidersAttrKey
-import dev.extframework.extension.core.minecraft.environment.mappingTargetAttrKey
-import dev.extframework.extension.core.target.TargetLinker
-import dev.extframework.extension.core.util.withSlashes
+import dev.extframework.core.app.TargetLinker
+import dev.extframework.core.app.api.ApplicationTarget
+import dev.extframework.core.entrypoint.Entrypoint
+import dev.extframework.core.minecraft.api.MappingNamespace
+import dev.extframework.core.minecraft.environment.mappingProvidersAttrKey
+import dev.extframework.core.minecraft.environment.mappingTargetAttrKey
 import dev.extframework.integrations.fabric.dependency.FabricModNode
 import dev.extframework.integrations.fabric.loader.FLLibNode
 import dev.extframework.integrations.fabric.loader.FLNode
-import dev.extframework.integrations.fabric.util.mapNamespaces
+import dev.extframework.integrations.fabric.mapping.FabricMappingProvider
+import dev.extframework.integrations.fabric.mapping.mapNamespaces
 import dev.extframework.integrations.fabric.util.write
 import dev.extframework.tooling.api.environment.*
-import dev.extframework.tooling.api.target.ApplicationTarget
 import net.fabricmc.api.EnvType
 import net.fabricmc.loader.impl.FabricLoaderImpl
 import net.fabricmc.loader.impl.FormattedException
@@ -38,7 +38,7 @@ import net.fabricmc.loader.impl.launch.FabricLauncherBase
 import net.fabricmc.loader.impl.launch.knot.MixinServiceKnot
 import net.fabricmc.loader.impl.lib.accesswidener.AccessWidenerClassVisitor
 import net.fabricmc.loader.impl.transformer.FabricTransformer
-import net.fabricmc.loader.impl.util.SystemProperties
+import net.fabricmc.loader.impl.util.FileSystemUtil
 import net.fabricmc.mappingio.format.tiny.Tiny1FileWriter
 import org.objectweb.asm.ClassReader
 import org.objectweb.asm.tree.ClassNode
@@ -51,16 +51,12 @@ import java.nio.file.Files
 import kotlin.io.path.exists
 import kotlin.io.path.writeText
 
-class FabricIntegration : Extension() {
+class FabricIntegration : Entrypoint() {
     // Btw, this system is really fucking cool
     override fun init() {
         val startTime = System.currentTimeMillis()
 
         val mappingsProviders = FabricIntegrationTweaker.tweakerEnv[mappingProvidersAttrKey].extract()
-        val rawIntermediaryProvider =
-            RawFabricMappingProvider(FabricIntegrationTweaker.tweakerEnv[wrkDirAttrKey].extract().value resolve "mappings" resolve "raw-intermediary")
-        val intermediaryProvider = FabricMappingProvider(rawIntermediaryProvider)
-        mappingsProviders.add(intermediaryProvider)
 
         val mappingTarget = FabricIntegrationTweaker.tweakerEnv[mappingTargetAttrKey].extract().value
         if (FabricIntegrationTweaker.fabricMappingsPath.make()) {
@@ -95,7 +91,7 @@ class FabricIntegration : Extension() {
         val archiveGraph = FabricIntegrationTweaker.tweakerEnv.archiveGraph
 
         System.setProperty(
-            SystemProperties.ADD_MODS,
+            net.fabricmc.loader.impl.util.SystemProperties.ADD_MODS,
             archiveGraph.nodes().filterIsInstance<FabricModNode<*>>()
                 .joinToString(separator = File.pathSeparator) { it.path.toString() }
         )
@@ -149,7 +145,10 @@ class FabricIntegration : Extension() {
 
         remapClasspath.writeText(mappedTarget.toString())
         // Fabric wants a file pointing to the remap-classpath, so thats what we do above.
-        System.setProperty(SystemProperties.REMAP_CLASSPATH_FILE, remapClasspath.toString())
+        System.setProperty(
+            net.fabricmc.loader.impl.util.SystemProperties.REMAP_CLASSPATH_FILE,
+            remapClasspath.toString()
+        )
 
         // Set the context classloader to this thread for service-loading of our game provider
         Thread.currentThread().contextClassLoader = this::class.java.classLoader
@@ -160,7 +159,8 @@ class FabricIntegration : Extension() {
 
         try {
             // Create the extframework launcher
-            val launcher = ExtFrameworkLauncher(EnvType.CLIENT, mappingTarget != MappingNamespace("mojang", "obfuscated"))
+            val launcher =
+                ExtFrameworkLauncher(EnvType.CLIENT, mappingTarget != MappingNamespace("mojang", "obfuscated"))
 
             // Start the launcher
             launcher.init(arrayOf())
@@ -182,16 +182,15 @@ class FabricIntegration : Extension() {
             EntrypointPatch(minecraftGameProvider).process(
                 launcher,
                 // Class source function, just load source from the allClasses source provider
-                { name ->
+                { name: String ->
                     val buffer = target.node.handle!!.classloader.getResourceAsStream(
-                        name.withSlashes() + ".class"
+                        name.replace('.', '/') + ".class"
                     )
                     buffer?.readInputStream()?.let(::ClassReader)?.let { r ->
                         ClassNode().also { r.accept(it, 0) }
                     }
                 }
             ) { node: ClassNode ->
-
                 FabricIntegrationTweaker.entrypointAgent.registerPatches(
                     listOf(node)
                 )
@@ -311,6 +310,7 @@ class FabricIntegration : Extension() {
         FabricIntegrationTweaker.turnOffResources = true
 //   TODO rewrite a new context loader that truly has context     Thread.currentThread().contextClassLoader = appRef.handle.classloader
 
+        FileSystemUtil.closeAll()
         println("Fabric initialization complete. Total phase took: '${(System.currentTimeMillis() - startTime) / 1000f}' seconds")
     }
 }

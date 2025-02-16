@@ -5,14 +5,13 @@ import dev.extframework.gradle.common.dm.jobs
 import dev.extframework.gradle.deobf.MinecraftMappings
 import dev.extframework.gradle.publish.ExtensionPublication
 import dev.extframework.tooling.api.extension.ExtensionRepository
-import kotlin.jvm.java
 
 plugins {
     kotlin("jvm") version "1.9.21"
 
     id("maven-publish")
-    id("dev.extframework.mc") version "1.2.25"
-    id("dev.extframework.common") version "1.0.37"
+    id("dev.extframework.mc") version "1.2.31"
+    id("dev.extframework.common") version "1.0.49"
 }
 
 tasks.wrapper {
@@ -20,54 +19,17 @@ tasks.wrapper {
 }
 
 group = "dev.extframework.integrations"
-version = "1.0.1-BETA"
+version = "1.0.2-BETA"
 
 val fabricLoaderVersion = "0.16.9"
 
 tasks.launch {
-    targetNamespace.set("mojang:deobfuscated")
-    mcVersion.set("1.21.3")
-    jvmArgs(
-        "-XstartOnFirstThread",
-        "-Xmx3G",
-        "-XX:+UnlockExperimentalVMOptions",
-        "-XX:+UseG1GC",
-        "-XX:G1NewSizePercent=20",
-        "-XX:G1ReservePercent=20",
-        "-XX:MaxGCPauseMillis=50",
-        "-XX:G1HeapRegionSize=32M"
-    )
-}
-
-repositories {
-    mavenCentral()
-    extframework()
-    maven {
-        url = uri("https://maven.fabricmc.net/")
-    }
-    maven {
-        url = uri("https://maven.neoforged.net/releases")
-    }
-    maven {
-        url = uri("https://libraries.minecraft.net")
-    }
-    maven {
-        url = uri("https://repo.extframework.dev/registry")
-    }
+    targetNamespace.set(MinecraftMappings.mojang.obfuscatedNamespace)
+    mcVersion.set("1.21.4")
 }
 
 dependencies {
     implementation("io.github.llamalad7:mixinextras-fabric:0.4.1")
-    implementation(kotlin("stdlib"))
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.3")
-
-    archives()
-    commonUtil()
-    boot()
-    artifactResolver(maven = true)
-    archiveMapper(transform = true, tiny = true)
-    toolingApi()
-    extLoader()
 
     implementation("net.fabricmc:tiny-remapper:0.8.2")
     implementation("net.fabricmc:fabric-loader:$fabricLoaderVersion")
@@ -79,12 +41,14 @@ dependencies {
         isTransitive = false
     }
 
-    implementation("org.ow2.asm:asm-commons:9.6")
-
     testImplementation(kotlin("test"))
 }
 
 extension {
+    extensions {
+        require("dev.extframework.integrations:fabric-mappings:1.0.2-BETA")
+        require("dev.extframework.extension:access-tweaks:1.0.1-BETA")
+    }
     partitions {
         tweaker {
             tweakerClass = "dev.extframework.integrations.fabric.FabricIntegrationTweaker"
@@ -98,6 +62,8 @@ extension {
                 archiveMapper()
                 toolingApi()
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.3")
+                implementation("dev.extframework.core:app-api:1.0-BETA")
+                implementation("dev.extframework.core:minecraft-api:1.0-BETA")
 
                 implementation("com.fasterxml.jackson.module:jackson-module-kotlin:2.13.4")
                 implementation(fileTree("build-ext/extensions"))
@@ -109,7 +75,7 @@ extension {
                 dependencies.addAll(
                     mutableMapOf(
                         "fl-version" to fabricLoaderVersion,
-                    ),
+                    )
                 )
 
                 repositories.addAll(
@@ -121,9 +87,21 @@ extension {
             }
             extensionClass = "dev.extframework.integrations.fabric.FabricIntegration"
             dependencies {
-                coreApi()
-                archiveMapper(tiny = true, proguard = true)
-                implementation("net.minecraft:launchwrapper:1.12")
+                implementation("dev.extframework.core:app-api:1.0-BETA")
+                implementation("dev.extframework.core:entrypoint:1.0-BETA")
+                implementation("dev.extframework.core:capability:1.0-BETA")
+                implementation("dev.extframework.core:minecraft-api:1.0-BETA")
+                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.3")
+
+                archives()
+                commonUtil()
+                boot()
+                artifactResolver(maven = true)
+                archiveMapper(transform = true, tiny = true)
+                toolingApi()
+                extLoader()
+
+                implementation("org.ow2.asm:asm-commons:9.6")
             }
         }
     }
@@ -149,6 +127,10 @@ publishing {
     }
 }
 
+tasks.test {
+    useJUnitPlatform()
+}
+
 java {
     toolchain {
         languageVersion.set(JavaLanguageVersion.of(21))
@@ -159,6 +141,27 @@ kotlin {
     jvmToolchain(21)
 }
 
-tasks.test {
-    useJUnitPlatform()
+allprojects {
+    apply(plugin = "maven-publish")
+    apply(plugin = "org.jetbrains.kotlin.jvm")
+    apply(plugin = "dev.extframework.mc")
+    apply(plugin = "dev.extframework.common")
+
+    repositories {
+        mavenCentral()
+        extframework()
+        maven {
+            url = uri("https://maven.fabricmc.net/")
+        }
+        maven {
+            url = uri("https://maven.neoforged.net/releases")
+        }
+        maven {
+            url = uri("https://libraries.minecraft.net")
+        }
+        maven {
+            url = uri("https://repo.extframework.dev/registry")
+        }
+        mavenLocal()
+    }
 }
