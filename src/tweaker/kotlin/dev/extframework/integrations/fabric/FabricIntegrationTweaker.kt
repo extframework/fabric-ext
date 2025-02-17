@@ -60,13 +60,15 @@ class FabricIntegrationTweaker : EnvironmentTweaker {
         minecraftVersion = environment[ApplicationTarget].map { it.node.descriptor.version }.extract()
 
         val mixinAgents by environment[instrumentAgentsAttrKey]
-//
+
         mixinAgents.add(
+            0,
             EntrypointMixinAgent().also {
                 entrypointAgent = it
             }
         )
         mixinAgents.add(
+            0,
             SpongeMixinAgent().also {
                 spongeMixinAgent = it
             }

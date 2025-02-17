@@ -46,7 +46,7 @@ dependencies {
 
 extension {
     extensions {
-        require("dev.extframework.integrations:fabric-mappings:1.0.2-BETA")
+        require("dev.extframework.integrations:fabric-mappings:1.0-BETA")
         require("dev.extframework.extension:access-tweaks:1.0.1-BETA")
     }
     partitions {
@@ -162,6 +162,5 @@ allprojects {
         maven {
             url = uri("https://repo.extframework.dev/registry")
         }
-        mavenLocal()
     }
 }

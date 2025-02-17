@@ -262,18 +262,18 @@ class FabricIntegration : Entrypoint() {
                 // ++++++++++ STAGE 3 ++++++++++
                 // -----------------------------
 
-                val stage3Node = ClassNode()
-                // Create a access widener and then apply it
-                val accessWidener = AccessWidenerClassVisitor.createClassVisitor(
-                    FabricLoaderImpl.ASM_VERSION,
-                    stage3Node,
-                    FabricLoaderImpl.INSTANCE.accessWidener
-                )
+//                val stage3Node = ClassNode()
+//                // Create a access widener and then apply it
+//                val accessWidener = AccessWidenerClassVisitor.createClassVisitor(
+//                    FabricLoaderImpl.ASM_VERSION,
+//                    stage3Node,
+//                    FabricLoaderImpl.INSTANCE.accessWidener
+//                )
 
-                stage2Node.accept(accessWidener)
+//                stage2Node.accept(accessWidener)
 
                 // Return the final node
-                stage3Node
+                stage2Node
             }
             // Iterate through every library and minecraft class
         } catch (e: FormattedException) {
