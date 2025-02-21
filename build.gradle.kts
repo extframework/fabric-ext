@@ -10,8 +10,8 @@ plugins {
     kotlin("jvm") version "1.9.21"
 
     id("maven-publish")
-    id("dev.extframework.mc") version "1.2.31"
-    id("dev.extframework.common") version "1.0.49"
+    id("dev.extframework.mc") version "1.2.32"
+    id("dev.extframework.common") version "1.0.50"
 }
 
 tasks.wrapper {
@@ -19,7 +19,7 @@ tasks.wrapper {
 }
 
 group = "dev.extframework.integrations"
-version = "1.0.2-BETA"
+version = "1.0.3-BETA"
 
 val fabricLoaderVersion = "0.16.9"
 
