@@ -18,6 +18,7 @@ extension {
         name = "Fabric Mappings"
         description = "An extension that brings Fabric Intermediary mappings to extframework"
         developers.add("extframework")
+        app = "minecraft"
     }
 }
 
