@@ -28,7 +28,6 @@ import dev.extframework.common.util.resolve
 import dev.extframework.common.util.toUrl
 import dev.extframework.core.app.TargetLinker
 import dev.extframework.integrations.fabric.FabricIntegrationTweaker
-import dev.extframework.tooling.api.environment.getOrNull
 import kotlinx.coroutines.awaitAll
 import net.fabricmc.loader.impl.util.FileSystemUtil
 import java.io.File
@@ -305,13 +304,13 @@ private class FabricClassLoader(
         mutableListOf(
             object : ClassProvider {
                 private val delegate
-                    get() = FabricIntegrationTweaker.tweakerEnv[TargetLinker].getOrNull()?.targetLoader
+                    get() = FabricIntegrationTweaker.tweakerEnv[TargetLinker].targetLoader
                 override val packages: Set<String>
                     get() = setOf("*")
 
                 override fun findClass(name: String): Class<*>? =
                     dev.extframework.common.util.runCatching(ClassNotFoundException::class) {
-                        delegate?.loadClass(name)
+                        delegate.loadClass(name)
                     }
             })
     ) {
@@ -325,7 +324,7 @@ private class FabricClassLoader(
         mutableListOf(
             object : ResourceProvider {
                 override fun findResources(name: String): Sequence<URL> =
-                    FabricIntegrationTweaker.tweakerEnv[TargetLinker].getOrNull()?.targetLoader?.getResources(
+                    FabricIntegrationTweaker.tweakerEnv[TargetLinker].targetLoader.getResources(
                         name
                     )?.asSequence() ?: sequenceOf()
             }

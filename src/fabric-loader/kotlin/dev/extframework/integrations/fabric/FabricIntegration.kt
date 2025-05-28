@@ -22,12 +22,14 @@ import dev.extframework.core.entrypoint.Entrypoint
 import dev.extframework.core.minecraft.api.MappingNamespace
 import dev.extframework.core.minecraft.environment.mappingProvidersAttrKey
 import dev.extframework.core.minecraft.environment.mappingTargetAttrKey
+import dev.extframework.core.minecraft.environment.minecraft
 import dev.extframework.integrations.fabric.dependency.FabricModNode
 import dev.extframework.integrations.fabric.loader.FLLibNode
 import dev.extframework.integrations.fabric.loader.FLNode
 import dev.extframework.integrations.fabric.mapping.FabricMappingProvider
 import dev.extframework.integrations.fabric.mapping.mapNamespaces
 import dev.extframework.integrations.fabric.util.write
+import dev.extframework.tooling.api.ExtensionLoader
 import dev.extframework.tooling.api.environment.*
 import net.fabricmc.api.EnvType
 import net.fabricmc.loader.impl.FabricLoaderImpl
@@ -52,13 +54,12 @@ import kotlin.io.path.exists
 import kotlin.io.path.writeText
 
 class FabricIntegration : Entrypoint() {
-    // Btw, this system is really fucking cool
     override fun init() {
         val startTime = System.currentTimeMillis()
 
-        val mappingsProviders = FabricIntegrationTweaker.tweakerEnv[mappingProvidersAttrKey].extract()
+        val mappingsProviders = FabricIntegrationTweaker.tweakerEnv[mappingProvidersAttrKey]
 
-        val mappingTarget = FabricIntegrationTweaker.tweakerEnv[mappingTargetAttrKey].extract().value
+        val mappingTarget = FabricIntegrationTweaker.tweakerEnv[mappingTargetAttrKey].value
         if (FabricIntegrationTweaker.fabricMappingsPath.make()) {
             val intermediaryToOfficialMappings = createIntermediaryToOfficialMappings(
                 FabricIntegrationTweaker.tweakerEnv, FabricIntegrationTweaker.minecraftVersion,
@@ -86,9 +87,9 @@ class FabricIntegration : Entrypoint() {
             trySetAccessible()
         }.set(null, 6)
 
-        val target = FabricIntegrationTweaker.tweakerEnv[ApplicationTarget].extract()
+        val target = FabricIntegrationTweaker.tweakerEnv[ApplicationTarget]
 
-        val archiveGraph = FabricIntegrationTweaker.tweakerEnv.archiveGraph
+        val archiveGraph = FabricIntegrationTweaker.tweakerEnv[ExtensionLoader].graph
 
         System.setProperty(
             net.fabricmc.loader.impl.util.SystemProperties.ADD_MODS,
@@ -111,7 +112,7 @@ class FabricIntegration : Entrypoint() {
             targetLocation.toString()
         )
 
-        val mappedTarget = FabricIntegrationTweaker.tweakerEnv[wrkDirAttrKey].extract()
+        val mappedTarget = FabricIntegrationTweaker.tweakerEnv[wrkDirAttrKey]
             .value resolve "remapped" resolve "minecraft" resolve "intermediary" resolve mappingTarget.path resolve "minecraft-${FabricIntegrationTweaker.minecraftVersion}.jar" //Files.createTempFile("mc-target", ".jar")
 
         if (!mappedTarget.exists()) {
@@ -258,20 +259,6 @@ class FabricIntegration : Entrypoint() {
                 val stage2Node = ClassNode()
                 ClassReader(stage2Bytes).accept(stage2Node, ClassReader.EXPAND_FRAMES)
 
-                // -----------------------------
-                // ++++++++++ STAGE 3 ++++++++++
-                // -----------------------------
-
-//                val stage3Node = ClassNode()
-//                // Create a access widener and then apply it
-//                val accessWidener = AccessWidenerClassVisitor.createClassVisitor(
-//                    FabricLoaderImpl.ASM_VERSION,
-//                    stage3Node,
-//                    FabricLoaderImpl.INSTANCE.accessWidener
-//                )
-
-//                stage2Node.accept(accessWidener)
-
                 // Return the final node
                 stage2Node
             }
@@ -282,7 +269,7 @@ class FabricIntegration : Entrypoint() {
                 .invoke(null, e)
         }
 
-        FabricIntegrationTweaker.tweakerEnv[TargetLinker].extract().addExtensionClasses(object : ClassProvider {
+        FabricIntegrationTweaker.tweakerEnv[TargetLinker].addExtensionClasses(object : ClassProvider {
             override val packages: Set<String> =
                 archiveGraph.nodes()
                     .filterIsInstance<FLNode>()
@@ -303,8 +290,7 @@ class FabricIntegration : Entrypoint() {
             }
         })
 
-        FabricIntegrationTweaker.knotClassloader =
-            defer("Fabric target classloader") { FabricLauncherBase.getLauncher().targetClassLoader }
+        FabricIntegrationTweaker.knotClassloader = FabricLauncherBase.getLauncher().targetClassLoader
 
         // Turn off resources so mixin generation is forced to go through extframework
         FabricIntegrationTweaker.turnOffResources = true
@@ -320,12 +306,12 @@ private fun createIntermediaryToOfficialMappings(
     version: String,
 ): ArchiveMapping {
     val graph = newMappingsGraph(
-        env[mappingProvidersAttrKey].extract().toList()
+        env[mappingProvidersAttrKey].toList()
     )
 
     val provider = graph.findShortest(
         "fabric:intermediary",
-        env[mappingTargetAttrKey].extract().value.identifier
+        env[mappingTargetAttrKey].value.identifier
     )
 
     return provider.forIdentifier(version)

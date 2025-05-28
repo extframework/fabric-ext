@@ -7,7 +7,8 @@ import dev.extframework.common.util.readInputStream
 import dev.extframework.common.util.toBytes
 import dev.extframework.core.app.TargetLinker
 import dev.extframework.core.app.api.ApplicationTarget
-import dev.extframework.tooling.api.environment.extract
+import dev.extframework.core.minecraft.api.MinecraftAppApi
+import dev.extframework.core.minecraft.environment.minecraft
 import net.fabricmc.api.EnvType
 import net.fabricmc.loader.api.FabricLoader
 import net.fabricmc.loader.api.entrypoint.PreLaunchEntrypoint
@@ -32,7 +33,6 @@ import java.util.*
 import java.util.concurrent.ConcurrentHashMap
 import java.util.jar.Manifest
 
-
 class ExtFrameworkLauncher(
     private var envType: EnvType,
     private var development: Boolean// = false
@@ -42,12 +42,12 @@ class ExtFrameworkLauncher(
 
     private class KnotClassLoaderReplacement : MutableClassLoader(
         name = "Knot Classloader replacement",
-        classes = MutableClassProvider(mutableListOf(ArchiveClassProvider(classLoaderToArchive(FabricIntegrationTweaker.tweakerEnv[TargetLinker].extract().targetLoader)))),
+        classes = MutableClassProvider(mutableListOf(ArchiveClassProvider(classLoaderToArchive(FabricIntegrationTweaker.tweakerEnv[TargetLinker].targetLoader)))),
         resources = MutableResourceProvider(
             mutableListOf(
                 ArchiveResourceProvider(
                     classLoaderToArchive(
-                        FabricIntegrationTweaker.tweakerEnv[TargetLinker].extract().targetLoader
+                        FabricIntegrationTweaker.tweakerEnv[TargetLinker].targetLoader
                     )
                 )
             )
@@ -135,7 +135,7 @@ class ExtFrameworkLauncher(
             "Class path entries reference missing files: %s - the game may not load properly!",
             java.lang.String.join(", ", missing)
         )
-        provider = createGameProvider(args)
+        provider = createGameProvider(args, )
 
         Log.finishBuiltinConfig()
         Log.info(
@@ -158,11 +158,6 @@ class ExtFrameworkLauncher(
 //        development = false
         loader.freeze()
 
-        // TODO It would be a good idea to fix this so that access wideners actually work instead of just
-        //   opening everything and running in deobfuscated
-//        FabricLoaderImpl.INSTANCE.loadAccessWideners()
-
-//        development = true
         FabricMixinBootstrap.init(environmentType, loader)
         development = false
         finishMixinBootstrapping()
@@ -180,7 +175,9 @@ class ExtFrameworkLauncher(
         return loader
     }
 
-    private fun createGameProvider(args: Array<String>): ExtFrameworkGameProvider {
+    private fun createGameProvider(
+        args: Array<String>,
+    ): ExtFrameworkGameProvider {
         val provider = ExtFrameworkGameProvider()
 
         provider.locateGame(this, args)
@@ -192,7 +189,7 @@ class ExtFrameworkLauncher(
     }
 
     override fun getClassPath(): List<Path> {
-        val reference = FabricIntegrationTweaker.tweakerEnv[ApplicationTarget].extract()
+        val reference : ApplicationTarget = FabricIntegrationTweaker.tweakerEnv[ApplicationTarget]
         return listOf(reference.path)
     }
 
@@ -237,9 +234,9 @@ class ExtFrameworkLauncher(
 
     @Throws(IOException::class)
     override fun getClassByteArray(name: String, runTransformers: Boolean): ByteArray? {
-        // Can ignore transformation as our game provider doesnt provide that.
-
-        val targetRef = FabricIntegrationTweaker.tweakerEnv[ApplicationTarget].extract().node.handle?.classloader
+        // SPECIFICALLY IGNORING TRANSFORMATIONS MADE BY THE INSTRUMENTED APP TARGET
+        val targetRef =
+            FabricIntegrationTweaker.tweakerEnv.minecraft.node.handle?.classloader
             ?.getResource(name.replace('.', '/') + ".class")?.readBytes()
 
         return targetRef ?: classloader.getResourceAsStream(

@@ -16,5 +16,9 @@ jobs:
           java-version: 17
       - name: Grant permissions to Gradle
         run: chmod +x gradlew
+      - name: Setup build cache
+        run: ./gradlew -Dorg.gradle.jvmargs=-Xmx4096m
+        continue-on-error: true
       - name: Publish with Gradle
-        run: ./gradlew :publishExtension -Pcreds.ext.key='${{ secrets.EXTENSION_REPO_KEY }}' -Dorg.gradle.jvmargs=-Xmx512m
+        if: always()
+        run: ./gradlew :publishExtension -Pcreds.ext.key='${{ secrets.EXTENSION_REPO_KEY }}' -Dorg.gradle.jvmargs=-Xmx4096m

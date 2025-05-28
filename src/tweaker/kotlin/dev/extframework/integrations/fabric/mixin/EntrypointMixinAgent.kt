@@ -17,7 +17,6 @@ class EntrypointMixinAgent : InstrumentAgent {
     }
 
     override fun transformClass(name: String, node: ClassNode?): ClassNode? {
-//        return ode
         return patches[name] ?: node
     }
 }

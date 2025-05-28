@@ -1,15 +1,12 @@
 package dev.extframework.integrations.fabric.dependency
 
 import com.durganmcbroom.artifact.resolver.ArtifactMetadata
-import com.durganmcbroom.artifact.resolver.simple.maven.SimpleMavenDescriptor
 import dev.extframework.archives.ArchiveHandle
 import dev.extframework.archives.ArchiveReference
 import dev.extframework.archives.Archives
 import dev.extframework.boot.archive.ArchiveAccessTree
 import dev.extframework.boot.dependency.DependencyNode
-import dev.extframework.common.util.copyTo
 import dev.extframework.integrations.fabric.FabricIntegrationTweaker
-import dev.extframework.tooling.api.environment.getOrNull
 import java.nio.file.Files
 import java.nio.file.Path
 import kotlin.io.path.outputStream
@@ -33,7 +30,7 @@ class FabricModNode<T: ArtifactMetadata.Descriptor>(
         // Does not need to be parallel capable.
         override val classloader: ClassLoader = object : ClassLoader() {
             override fun loadClass(name: String): Class<*> {
-                return FabricIntegrationTweaker.knotClassloader.getOrNull()?.loadClass(name)
+                return FabricIntegrationTweaker.knotClassloader?.loadClass(name)
                     ?: throw ClassNotFoundException(name)
             }
         }

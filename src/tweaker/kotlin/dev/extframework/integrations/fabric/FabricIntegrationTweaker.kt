@@ -19,6 +19,7 @@ import dev.extframework.integrations.fabric.dependency.ModrinthFabricModProvider
 import dev.extframework.integrations.fabric.loader.FabricLoaderDependencyResolverProvider
 import dev.extframework.integrations.fabric.mixin.EntrypointMixinAgent
 import dev.extframework.integrations.fabric.mixin.SpongeMixinAgent
+import dev.extframework.tooling.api.ExtensionLoader
 import dev.extframework.tooling.api.environment.*
 import dev.extframework.tooling.api.tweaker.EnvironmentTweaker
 import java.nio.file.Path
@@ -35,14 +36,14 @@ class FabricIntegrationTweaker : EnvironmentTweaker {
         tweakerEnv = environment
 
         // Register the fabric loader dependency type (ONLY FOR THE FABRIC-INTEGRATION EXTENSION)
-        val dependencyTypes = environment[dependencyTypesAttrKey].extract().container
+        val dependencyTypes = environment[dependencyTypesAttrKey].container
 
         val flDepProvider = FabricLoaderDependencyResolverProvider()
         dependencyTypes.register(
             "fl",
             flDepProvider
         )
-        environment.archiveGraph.registerResolver(flDepProvider.resolver.libResolver)
+        environment[ExtensionLoader].graph.registerResolver(flDepProvider.resolver.libResolver)
 
         dependencyTypes.register(
             "fabric-mod:curse-maven",
@@ -57,9 +58,9 @@ class FabricIntegrationTweaker : EnvironmentTweaker {
         )
 
         // Set the minecraft version
-        minecraftVersion = environment[ApplicationTarget].map { it.node.descriptor.version }.extract()
+        minecraftVersion = environment[ApplicationTarget].node.descriptor.version
 
-        val mixinAgents by environment[instrumentAgentsAttrKey]
+        val mixinAgents = environment[instrumentAgentsAttrKey]
 
         mixinAgents.add(
             0,
@@ -91,19 +92,19 @@ class FabricIntegrationTweaker : EnvironmentTweaker {
             private set
 
         // The knot class loader, contains all fabric mods.
-        lateinit var knotClassloader: DeferredValue<ClassLoader>
+        lateinit var knotClassloader: ClassLoader
 
         // The path to where fabrics tiny mappings are. Will be mappings from
         // intermediary to whatever extframework is running in.
         val fabricMappingsPath
-            get() = tweakerEnv[wrkDirAttrKey].extract().value resolve "mappings" resolve "tiny" resolve tweakerEnv[mappingTargetAttrKey].extract().value.path resolve "$minecraftVersion.tiny"
+            get() = tweakerEnv[wrkDirAttrKey].value resolve "mappings" resolve "tiny" resolve tweakerEnv[mappingTargetAttrKey].value.path resolve "$minecraftVersion.tiny"
 
         // Whether to turn off access to Minecraft's resource from fabric, this forces
         // the fabric-loader to get them through extframework instead.
         var turnOffResources: Boolean = false
 
         val minecraftPath: Path by lazy {
-            (((tweakerEnv[ApplicationTarget].extract() as InstrumentedApplicationTarget).delegate) as MinecraftAppApi).gameJar
+            (((tweakerEnv[ApplicationTarget] as InstrumentedApplicationTarget).delegate) as MinecraftAppApi).gameJar
         }
 
         lateinit var entrypointAgent: EntrypointMixinAgent

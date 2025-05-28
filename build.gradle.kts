@@ -1,17 +1,19 @@
-import dev.extframework.gradle.*
-import dev.extframework.gradle.common.*
-import dev.extframework.gradle.common.dm.artifactResolver
-import dev.extframework.gradle.common.dm.jobs
-import dev.extframework.gradle.deobf.MinecraftMappings
+import dev.extframework.gradle.api.EvaluatingDependency
+import dev.extframework.gradle.common.archiveMapper
+import dev.extframework.gradle.common.extFramework
 import dev.extframework.gradle.publish.ExtensionPublication
+import dev.extframework.minecraft.MojangNamespaces
+import dev.extframework.minecraft.minecraft
+import dev.extframework.minecraft.task.LaunchMinecraft
 import dev.extframework.tooling.api.extension.ExtensionRepository
+import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
 plugins {
-    kotlin("jvm") version "1.9.21"
+    kotlin("jvm") version "2.0.21"
 
     id("maven-publish")
-    id("dev.extframework.mc") version "1.2.32"
-    id("dev.extframework.common") version "1.0.50"
+    id("dev.extframework") version "1.3.3"
+    id("dev.extframework.common") version "1.0.53"
 }
 
 tasks.wrapper {
@@ -19,62 +21,29 @@ tasks.wrapper {
 }
 
 group = "dev.extframework.integrations"
-version = "1.0.3-BETA"
+version = "1.0.5-BETA"
 
-val fabricLoaderVersion = "0.16.9"
+val fabricLoaderVersion = "0.16.10"
 
-tasks.launch {
-    targetNamespace.set(MinecraftMappings.mojang.obfuscatedNamespace)
-    mcVersion.set("1.21.4")
-}
-
-dependencies {
-    implementation("io.github.llamalad7:mixinextras-fabric:0.4.1")
-
-    implementation("net.fabricmc:tiny-remapper:0.8.2")
-    implementation("net.fabricmc:fabric-loader:$fabricLoaderVersion")
-    implementation("cpw.mods:modlauncher:10.1.9")
-    implementation("net.fabricmc:sponge-mixin:0.12.5+mixin.0.8.5") {
-        exclude(group = "org.ow2.asm")
-    }
-    implementation("net.fabricmc:mapping-io:0.5.0") {
-        isTransitive = false
-    }
-
-    testImplementation(kotlin("test"))
+val launch1_21_4 by tasks.registering(LaunchMinecraft::class) {
+    dependsOn(tasks.named("publishToMavenLocal"))
+    dependsOn(project("mappings").tasks.named("publishToMavenLocal"))
+    targetNamespace = MojangNamespaces.obfuscated.identifier
+    javaLauncher.set(javaToolchains.launcherFor {
+        languageVersion.set(JavaLanguageVersion.of(21))
+    })
+    mcVersion = "1.21.4"
 }
 
 extension {
-    extensions {
-        require("dev.extframework.integrations:fabric-mappings:1.0-BETA")
-        require("dev.extframework.extension:access-tweaks:1.0.1-BETA")
-    }
-    partitions {
-        tweaker {
-            tweakerClass = "dev.extframework.integrations.fabric.FabricIntegrationTweaker"
-            dependencies {
-                commonUtil()
-                objectContainer()
-                boot()
-                archives(mixin = true)
-                jobs()
-                artifactResolver(maven = true)
-                archiveMapper()
-                toolingApi()
-                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.3")
-                implementation("dev.extframework.core:app-api:1.0-BETA")
-                implementation("dev.extframework.core:minecraft-api:1.0-BETA")
-
-                implementation("com.fasterxml.jackson.module:jackson-module-kotlin:2.13.4")
-                implementation(fileTree("build-ext/extensions"))
-            }
-        }
-
-        main {
-            model {
+    finalizedBy {
+        model {
+            partition("fabric-loader") {
                 dependencies.addAll(
-                    mutableMapOf(
-                        "fl-version" to fabricLoaderVersion,
+                    EvaluatingDependency.Raw(
+                        mapOf(
+                            "fl-version" to fabricLoaderVersion,
+                        )
                     )
                 )
 
@@ -85,24 +54,36 @@ extension {
                     )
                 )
             }
-            extensionClass = "dev.extframework.integrations.fabric.FabricIntegration"
+        }
+    }
+
+    partitions {
+        tweaker {
+            tweakerClass = "dev.extframework.integrations.fabric.FabricIntegrationTweaker"
             dependencies {
-                implementation("dev.extframework.core:app-api:1.0-BETA")
-                implementation("dev.extframework.core:entrypoint:1.0-BETA")
-                implementation("dev.extframework.core:capability:1.0-BETA")
-                implementation("dev.extframework.core:minecraft-api:1.0-BETA")
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.3")
 
-                archives()
-                commonUtil()
-                boot()
-                artifactResolver(maven = true)
+                implementation("com.fasterxml.jackson.module:jackson-module-kotlin:2.13.4")
+            }
+        }
+        gradle {
+            entrypointClass = "dev.extframework.integrations.fabric.FabricGradleEntrypoint"
+            dependencies {
+                implementation("dev.extframework:gradle-api:1.0.1-BETA")
+                implementation(gradleApi())
+            }
+        }
+        minecraft("fabric-loader") {
+            mappings = MojangNamespaces.obfuscated
+            entrypoint = "dev.extframework.integrations.fabric.FabricIntegration"
+            dependencies {
+                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.3")
+
                 archiveMapper(transform = true, tiny = true)
-                toolingApi()
-                extLoader()
 
                 implementation("org.ow2.asm:asm-commons:9.6")
             }
+            supportVersions("1.21.4")
         }
     }
 
@@ -110,7 +91,24 @@ extension {
         name = "Fabric Integration"
         description = "An extension that brings the fabric ecosystem to extframework"
         developers.add("extframework")
+        app = "minecraft"
     }
+}
+
+dependencies {
+    "fabric-loaderImplementation"("io.github.llamalad7:mixinextras-fabric:0.4.1")
+
+    "fabric-loaderImplementation"("net.fabricmc:tiny-remapper:0.8.2")
+    "fabric-loaderImplementation"("net.fabricmc:fabric-loader:$fabricLoaderVersion")
+//    implementation("cpw.mods:modlauncher:10.1.9")
+    "fabric-loaderImplementation"("net.fabricmc:sponge-mixin:0.12.5+mixin.0.8.5") {
+        exclude(group = "org.ow2.asm")
+    }
+    "fabric-loaderImplementation"("net.fabricmc:mapping-io:0.5.0") {
+        isTransitive = false
+    }
+
+    testImplementation(kotlin("test"))
 }
 
 publishing {
@@ -131,25 +129,47 @@ tasks.test {
     useJUnitPlatform()
 }
 
-java {
-    toolchain {
-        languageVersion.set(JavaLanguageVersion.of(21))
-    }
+tasks.compileKotlin {
+    kotlinJavaToolchain.toolchain.use(javaToolchains.launcherFor {
+        languageVersion.set(JavaLanguageVersion.of(17))
+    })
+}
+
+tasks.named<KotlinCompile>("compileFabric-loaderKotlin") {
+    kotlinJavaToolchain.toolchain.use(javaToolchains.launcherFor {
+        languageVersion.set(JavaLanguageVersion.of(17))
+    })
+}
+
+tasks.named<JavaCompile>(sourceSets.named("fabric-loader").get().compileJavaTaskName) {
+    javaCompiler.set(
+        javaToolchains.compilerFor {
+            languageVersion.set(JavaLanguageVersion.of(17))
+        }
+    )
+}
+
+tasks.compileJava {
+    javaCompiler.set(
+        javaToolchains.compilerFor {
+            languageVersion.set(JavaLanguageVersion.of(17))
+        }
+    )
 }
 
 kotlin {
-    jvmToolchain(21)
+    jvmToolchain(8)
 }
 
 allprojects {
     apply(plugin = "maven-publish")
     apply(plugin = "org.jetbrains.kotlin.jvm")
-    apply(plugin = "dev.extframework.mc")
+    apply(plugin = "dev.extframework")
     apply(plugin = "dev.extframework.common")
 
     repositories {
         mavenCentral()
-        extframework()
+        extFramework()
         maven {
             url = uri("https://maven.fabricmc.net/")
         }
