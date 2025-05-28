@@ -25,6 +25,15 @@ version = "1.0.5-BETA"
 
 val fabricLoaderVersion = "0.16.10"
 
+val publishAll by tasks.creating {
+    listOf(
+        ":",
+        ":mappings"
+    ).forEach {
+        dependsOn(project(it).tasks.named("publishExtension"))
+    }
+}
+
 val launch1_21_4 by tasks.registering(LaunchMinecraft::class) {
     dependsOn(tasks.named("publishToMavenLocal"))
     dependsOn(project("mappings").tasks.named("publishToMavenLocal"))
