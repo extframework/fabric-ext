@@ -87,7 +87,7 @@ class FabricIntegration : Entrypoint() {
             trySetAccessible()
         }.set(null, 6)
 
-        val target = FabricIntegrationTweaker.tweakerEnv[ApplicationTarget]
+        val target = FabricIntegrationTweaker.tweakerEnv.minecraft
 
         val archiveGraph = FabricIntegrationTweaker.tweakerEnv[ExtensionLoader].graph
 
@@ -124,7 +124,7 @@ class FabricIntegration : Entrypoint() {
             val mappings = newMappingsGraph(mappingsProviders).findShortest(
                 FabricMappingProvider.INTERMEDIARY_NAMESPACE,
                 mappingTarget.identifier,
-            ).forIdentifier(target.node.descriptor.version)
+            ).forIdentifier(target.version)
 
             transformArchive(
                 newTargetRef,
@@ -184,7 +184,7 @@ class FabricIntegration : Entrypoint() {
                 launcher,
                 // Class source function, just load source from the allClasses source provider
                 { name: String ->
-                    val buffer = target.node.handle!!.classloader.getResourceAsStream(
+                    val buffer = target.node.handle?.classloader?.getResourceAsStream(
                         name.replace('.', '/') + ".class"
                     )
                     buffer?.readInputStream()?.let(::ClassReader)?.let { r ->

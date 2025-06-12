@@ -90,7 +90,7 @@ public class ExtFrameworkGameProvider implements GameProvider {
 
     @Override
     public String getEntrypoint() {
-        return "n/a";
+        return minecraftAppApi.getMainClass();
     }
 
     @Override

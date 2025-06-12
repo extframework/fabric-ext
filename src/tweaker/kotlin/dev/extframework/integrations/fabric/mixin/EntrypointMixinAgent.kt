@@ -9,11 +9,11 @@ class EntrypointMixinAgent : InstrumentAgent {
     fun registerPatches(
         patches: List<ClassNode>
     ) {
-       this.patches.putAll(
-           patches.associateBy {
-               it.name.replace('/', '.')
-           }
-       )
+        this.patches.putAll(
+            patches.associateBy {
+                it.name.replace('/', '.')
+            }
+        )
     }
 
     override fun transformClass(name: String, node: ClassNode?): ClassNode? {

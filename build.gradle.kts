@@ -12,7 +12,7 @@ plugins {
     kotlin("jvm") version "2.0.21"
 
     id("maven-publish")
-    id("dev.extframework") version "1.3.3"
+    id("dev.extframework") version "1.3.5"
     id("dev.extframework.common") version "1.0.53"
 }
 
@@ -21,7 +21,7 @@ tasks.wrapper {
 }
 
 group = "dev.extframework.integrations"
-version = "1.0.5-BETA"
+version = "1.0.6-BETA"
 
 val fabricLoaderVersion = "0.16.10"
 
@@ -53,14 +53,13 @@ extension {
                         mapOf(
                             "fl-version" to fabricLoaderVersion,
                         )
-                    )
+                    ),
                 )
-
                 repositories.addAll(
                     ExtensionRepository(
                         "fl",
                         mutableMapOf()
-                    )
+                    ),
                 )
             }
         }
