@@ -1,5 +1,4 @@
 [repositories]
-local = true
 
 [parents]
 ":mappings" = {isBuild = true}
