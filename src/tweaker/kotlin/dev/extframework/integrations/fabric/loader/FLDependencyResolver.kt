@@ -1,15 +1,11 @@
 package dev.extframework.integrations.fabric.loader
 
 import com.durganmcbroom.artifact.resolver.Artifact
+import com.durganmcbroom.artifact.resolver.ArtifactRepository
+import com.durganmcbroom.artifact.resolver.RepositoryFactory
 import com.durganmcbroom.artifact.resolver.ResolutionContext
 import com.durganmcbroom.artifact.resolver.createContext
 import com.durganmcbroom.artifact.resolver.simple.maven.*
-import com.durganmcbroom.jobs.Job
-import com.durganmcbroom.jobs.SuccessfulJob
-import com.durganmcbroom.jobs.async.AsyncJob
-import com.durganmcbroom.jobs.async.asyncJob
-import com.durganmcbroom.jobs.async.mapAsync
-import com.durganmcbroom.jobs.result
 import com.durganmcbroom.resources.Resource
 import dev.extframework.archives.ArchiveHandle
 import dev.extframework.archives.ArchiveReference
@@ -20,8 +16,10 @@ import dev.extframework.boot.archive.*
 import dev.extframework.boot.dependency.DependencyNode
 import dev.extframework.boot.dependency.DependencyResolver
 import dev.extframework.boot.loader.*
+import dev.extframework.boot.monad.Either
 import dev.extframework.boot.monad.Tagged
 import dev.extframework.boot.monad.Tree
+import dev.extframework.boot.util.mapAsync
 import dev.extframework.boot.util.mapOfNonNullValues
 import dev.extframework.boot.util.requireKeyInDescriptor
 import dev.extframework.common.util.resolve
@@ -63,14 +61,13 @@ class FLDependencyResolver private constructor(
     override val name: String = "fl"
     internal val libResolver = FLLibDependencyResolver(resolutionProvider)
     override val apiVersion: Int = 2
-    override val context: ResolutionContext<SimpleMavenRepositorySettings, FLArtifactRequest, FLArtifactMetadata> = FabricRepositoryFactory.createContext()
+    override val factory: RepositoryFactory<SimpleMavenRepositorySettings, ArtifactRepository<SimpleMavenRepositorySettings, FLArtifactRequest, FLArtifactMetadata>>
+        get() = FabricRepositoryFactory
 
-    override fun deserializeDescriptor(descriptor: Map<String, String>, trace: ArchiveTrace): Result<FLDescriptor> =
-        result {
-            FLDescriptor(
-                descriptor.requireKeyInDescriptor("version") { trace }
-            )
-        }
+    override fun deserializeDescriptor(descriptor: Map<String, String>, trace: ArchiveTrace): FLDescriptor =
+        FLDescriptor(
+            descriptor.requireKeyInDescriptor("version") { trace }
+        )
 
     override suspend fun FLArtifactMetadata.resource(): Resource? {
         return jar
@@ -86,16 +83,17 @@ class FLDependencyResolver private constructor(
 
     constructor() : this(FabricResolutionProvider())
 
-    override fun cache(
-        artifact: Artifact<FLArtifactMetadata>,
+    override suspend fun cache(
+        metadata: FLArtifactMetadata,
+        parents: List<Tree<Either<FLArtifactMetadata, TaggedIArchive>>>,
         helper: CacheHelper<FLDescriptor>
-    ): AsyncJob<Tree<Tagged<IArchive<*>, ArchiveNodeResolver<*, *, *, *, *>>>> = asyncJob {
+    ): Tree<TaggedIArchive> {
         helper.withResource(
             "jar.jar",
-            artifact.metadata.resource()
+            metadata.resource()
         )
 
-        val libs = artifact.metadata.metadata.libraries
+        val libs = metadata.metadata.libraries
         val dependencies = (libs.common + libs.client + libs.development)
             .mapAsync { lib ->
                 val request = FLLibArtifactRequest(
@@ -107,12 +105,12 @@ class FLDependencyResolver private constructor(
                     request,
                     FLLibRepositorySettings,
                     libResolver
-                )().merge()
+                )
             }
             .awaitAll()
 
-        helper.newData(
-            artifact.metadata.descriptor,
+        return helper.newData(
+            metadata.descriptor,
             dependencies
         )
     }
@@ -137,8 +135,9 @@ class FLLibDependencyResolver(
     override val metadataType: Class<FLLibArtifactMetadata> = FLLibArtifactMetadata::class.java
     override val name: String = "fllib"
     override val apiVersion: Int = 2
-    override val context: ResolutionContext<FLLibRepositorySettings, FLLibArtifactRequest, FLLibArtifactMetadata>
-      = FLLibRepositoryFactory.createContext()
+    override val factory: RepositoryFactory<FLLibRepositorySettings, ArtifactRepository<FLLibRepositorySettings, FLLibArtifactRequest, FLLibArtifactMetadata>>
+        get() = FLLibRepositoryFactory
+
 
     override suspend fun FLLibArtifactMetadata.resource(): Resource {
         return jar
@@ -147,14 +146,13 @@ class FLLibDependencyResolver(
     override fun deserializeDescriptor(
         descriptor: Map<String, String>,
         trace: ArchiveTrace
-    ): Result<FLLibDescriptor> = result {
+    ): FLLibDescriptor =
         FLLibDescriptor(
             descriptor.requireKeyInDescriptor("group") { trace },
             descriptor.requireKeyInDescriptor("artifact") { trace },
             descriptor.requireKeyInDescriptor("version") { trace },
             descriptor["classifier"]
         )
-    }
 
     override fun pathForDescriptor(descriptor: FLLibDescriptor, classifier: String, type: String): Path {
         return Path(
@@ -211,7 +209,7 @@ private class FabricResolutionProvider : ArchiveResolutionProvider<ZipResolution
         classLoader: ClassLoaderProvider<ArchiveReference>,
         parents: Set<ArchiveHandle>,
         trace: ArchiveTrace
-    ): Job<ZipResolutionResult> {
+    ): ZipResolutionResult {
         // Load the archive
         val ref = Archives.find(resource, Archives.Finders.ZIP_FINDER)
 
@@ -284,14 +282,12 @@ private class FabricResolutionProvider : ArchiveResolutionProvider<ZipResolution
                 nameToUrl[it.name.replace('/', '.').removeSuffix(".class")] = url
             }
 
-        return SuccessfulJob {
-            Archives.resolve(
-                ref,
-                FabricIntegrationTweaker.fabricClassloader,
-                Archives.Resolvers.ZIP_RESOLVER,
-                parents
-            )
-        }
+        return Archives.resolve(
+            ref,
+            FabricIntegrationTweaker.fabricClassloader,
+            Archives.Resolvers.ZIP_RESOLVER,
+            parents
+        )
     }
 }
 

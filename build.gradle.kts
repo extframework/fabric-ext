@@ -1,5 +1,7 @@
 import dev.extframework.gradle.api.EvaluatingDependency
 import dev.extframework.gradle.common.archiveMapper
+import dev.extframework.gradle.common.archiveMapperTiny
+import dev.extframework.gradle.common.archiveMapperTransform
 import dev.extframework.gradle.common.extFramework
 import dev.extframework.gradle.publish.ExtensionPublication
 import dev.extframework.minecraft.MojangNamespaces
@@ -12,8 +14,8 @@ plugins {
     kotlin("jvm") version "2.0.21"
 
     id("maven-publish")
-    id("dev.extframework") version "1.3.5"
-    id("dev.extframework.common") version "1.0.53"
+    id("dev.extframework") version "1.4"
+    id("dev.extframework.common") version "1.1"
 }
 
 tasks.wrapper {
@@ -21,7 +23,7 @@ tasks.wrapper {
 }
 
 group = "dev.extframework.integrations"
-version = "1.0.6-BETA"
+version = "1.0.7-BETA"
 
 val fabricLoaderVersion = "0.16.10"
 
@@ -55,6 +57,7 @@ extension {
                         )
                     ),
                 )
+
                 repositories.addAll(
                     ExtensionRepository(
                         "fl",
@@ -77,7 +80,7 @@ extension {
         gradle {
             entrypointClass = "dev.extframework.integrations.fabric.FabricGradleEntrypoint"
             dependencies {
-                implementation("dev.extframework:gradle-api:1.0.1-BETA")
+                implementation("dev.extframework:gradle-api:1.1-BETA")
                 implementation(gradleApi())
             }
         }
@@ -87,7 +90,9 @@ extension {
             dependencies {
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.3")
 
-                archiveMapper(transform = true, tiny = true)
+                implementation(archiveMapper())
+                implementation(archiveMapperTiny())
+                implementation(archiveMapperTransform())
 
                 implementation("org.ow2.asm:asm-commons:9.6")
             }

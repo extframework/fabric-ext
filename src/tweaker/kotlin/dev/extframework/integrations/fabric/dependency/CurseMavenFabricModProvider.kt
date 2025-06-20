@@ -1,12 +1,11 @@
 package dev.extframework.integrations.fabric.dependency
 
 import com.durganmcbroom.artifact.resolver.Artifact
+import com.durganmcbroom.artifact.resolver.ArtifactRepository
+import com.durganmcbroom.artifact.resolver.RepositoryFactory
 import com.durganmcbroom.artifact.resolver.ResolutionContext
 import com.durganmcbroom.artifact.resolver.createContext
 import com.durganmcbroom.artifact.resolver.simple.maven.*
-import com.durganmcbroom.jobs.Job
-import com.durganmcbroom.jobs.async.AsyncJob
-import com.durganmcbroom.jobs.job
 import com.durganmcbroom.resources.Resource
 import com.durganmcbroom.resources.ResourceAlgorithm
 import dev.extframework.archives.ArchiveHandle
@@ -17,7 +16,6 @@ import dev.extframework.boot.maven.MavenLikeResolver
 import dev.extframework.boot.monad.Tagged
 import dev.extframework.boot.monad.Tree
 import dev.extframework.boot.util.typeOf
-import java.nio.file.Path
 
 internal class CurseMavenFabricModProvider(
     mavenProvider: DependencyResolverProvider<SimpleMavenDescriptor, SimpleMavenArtifactRequest, SimpleMavenRepositorySettings>
@@ -79,16 +77,10 @@ internal class CurseMavenFabricModDependencyResolver(
         return resource()
     }
 
-    override val context: ResolutionContext<SimpleMavenRepositorySettings, SimpleMavenArtifactRequest, SimpleMavenArtifactMetadata> = SimpleMaven.createContext()
     override val metadataType: Class<SimpleMavenArtifactMetadata> = SimpleMavenArtifactMetadata::class.java
+    override val factory: RepositoryFactory<SimpleMavenRepositorySettings, ArtifactRepository<SimpleMavenRepositorySettings, SimpleMavenArtifactRequest, SimpleMavenArtifactMetadata>>
+        get() = SimpleMaven
     override val name: String = "curse-fabric-mod"
-
-    override fun cache(
-        artifact: Artifact<SimpleMavenArtifactMetadata>,
-        helper: CacheHelper<SimpleMavenDescriptor>
-    ): AsyncJob<Tree<Tagged<IArchive<*>, ArchiveNodeResolver<*, *, *, *, *>>>> {
-        return super.cache(artifact, helper)
-    }
 
     override fun constructNode(
         descriptor: SimpleMavenDescriptor,
@@ -103,11 +95,9 @@ internal class CurseMavenFabricModDependencyResolver(
         data: ArchiveData<SimpleMavenDescriptor, CachedArchiveResource>,
         accessTree: ArchiveAccessTree,
         helper: ResolutionHelper
-    ): Job<FabricModNode<SimpleMavenDescriptor>> = job {
-        FabricModNode(
-            data.resources["jar.jar"]?.path,
-            data.descriptor,
-            accessTree
-        )
-    }
+    ): FabricModNode<SimpleMavenDescriptor> = FabricModNode(
+        data.resources["jar.jar"]?.path,
+        data.descriptor,
+        accessTree
+    )
 }

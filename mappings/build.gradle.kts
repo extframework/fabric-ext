@@ -1,15 +1,17 @@
 import dev.extframework.gradle.common.archiveMapper
+import dev.extframework.gradle.common.archiveMapperTiny
 import dev.extframework.gradle.publish.ExtensionPublication
 
 
 group = "dev.extframework.integrations"
-version = "1.0.2-BETA"
+version = "1.0.3-BETA"
 
 extension {
     partitions {
         tweaker {
             dependencies {
-                archiveMapper(tiny = true)
+                implementation(archiveMapper())
+                implementation(archiveMapperTiny())
             }
             tweakerClass = "dev.extframework.integrations.fabric.mapping.FabricMappingsTweaker"
         }

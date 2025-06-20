@@ -1,45 +1,23 @@
 package dev.extframework.integrations.fabric.dependency
 
-import com.durganmcbroom.artifact.resolver.ArtifactMetadata
+import com.durganmcbroom.artifact.resolver.*
 import com.durganmcbroom.artifact.resolver.ArtifactMetadata.Descriptor
-import com.durganmcbroom.artifact.resolver.ArtifactRepository
-import com.durganmcbroom.artifact.resolver.ArtifactRequest
-import com.durganmcbroom.artifact.resolver.MetadataRequestException
-import com.durganmcbroom.artifact.resolver.RepositoryFactory
-import com.durganmcbroom.artifact.resolver.RepositorySettings
-import com.durganmcbroom.artifact.resolver.ResolutionContext
-import com.durganmcbroom.artifact.resolver.createContext
-import com.durganmcbroom.jobs.Job
-import com.durganmcbroom.jobs.async.AsyncJob
-import com.durganmcbroom.jobs.async.asyncJob
-import com.durganmcbroom.jobs.job
-import com.durganmcbroom.jobs.mapException
-import com.durganmcbroom.jobs.result
-import com.durganmcbroom.resources.Resource
-import com.durganmcbroom.resources.ResourceAlgorithm
-import com.durganmcbroom.resources.ResourceNotFoundException
-import com.durganmcbroom.resources.VerifiedResource
-import com.durganmcbroom.resources.toByteArray
-import com.durganmcbroom.resources.toResource
+import com.durganmcbroom.resources.*
 import com.fasterxml.jackson.databind.DeserializationFeature
 import com.fasterxml.jackson.databind.PropertyNamingStrategies
 import com.fasterxml.jackson.databind.json.JsonMapper
 import com.fasterxml.jackson.module.kotlin.KotlinModule
 import com.fasterxml.jackson.module.kotlin.readValue
 import dev.extframework.archives.ArchiveHandle
-import dev.extframework.boot.archive.ArchiveAccessTree
-import dev.extframework.boot.archive.ArchiveData
-import dev.extframework.boot.archive.ArchiveTrace
-import dev.extframework.boot.archive.CachedArchiveResource
-import dev.extframework.boot.archive.ResolutionHelper
+import dev.extframework.boot.archive.*
 import dev.extframework.boot.dependency.DependencyNode
 import dev.extframework.boot.dependency.DependencyResolver
 import dev.extframework.boot.dependency.DependencyResolverProvider
 import dev.extframework.boot.util.requireKeyInDescriptor
 import dev.extframework.common.util.Hex
-import dev.extframework.common.util.runCatching
 import dev.extframework.integrations.fabric.FabricIntegrationTweaker
 import java.net.URI
+import java.net.URISyntaxException
 import java.net.URLEncoder
 import java.nio.file.Path
 import kotlin.io.path.Path
@@ -127,23 +105,23 @@ class ModrinthArtifactRepository :
         .addModule(KotlinModule.Builder().build())
         .build()
 
-    private fun encoded(str: String) : String {
+    private fun encoded(str: String): String {
         return URLEncoder.encode(str, "UTF-8")
     }
 
-    override fun get(request: ModrinthModArtifactRequest): AsyncJob<ModrinthModArtifactMetadata> = asyncJob() {
-        val version = mapper.readValue<ModrinthProjectVersion>(runCatching {
-            URI.create(
-                MODRINTH_VERSION_ENDPOINT + request.descriptor.versionId
-            ).toURL().toResource().open().toByteArray()
-        }.mapException {
-            if (it is ResourceNotFoundException) {
-                MetadataRequestException.MetadataNotFound(
+    override suspend fun get(request: ModrinthModArtifactRequest): ModrinthModArtifactMetadata {
+        val version = mapper.readValue<ModrinthProjectVersion>(
+            try {
+                URI.create(
+                    MODRINTH_VERSION_ENDPOINT + request.descriptor.versionId
+                ).toURL().toResource().open().toByteArray()
+            } catch (_: ResourceNotFoundException) {
+                throw MetadataRequestException.MetadataNotFound(
                     request.descriptor,
                     MODRINTH_VERSION_ENDPOINT + request.descriptor.versionId
                 )
-            } else it
-        }.merge())
+            }
+        )
 
         val primaryFile = version.files.find {
             it.primary
@@ -174,7 +152,8 @@ class ModrinthArtifactRepository :
                     val response = mapper.readValue<List<ModrinthProjectVersionListing>>(versionsResponse)
 
                     response.firstOrNull()?.id
-                } ?: throw MetadataRequestException("Failed to resolve dependency version of Modrinth project: '${it.projectId}' for project: '${request.descriptor.projectId}'")
+                }
+                ?: throw MetadataRequestException("Failed to resolve dependency version of Modrinth project: '${it.projectId}' for project: '${request.descriptor.projectId}'")
 
                 ModrinthModDescriptor(
                     it.projectId,
@@ -184,7 +163,7 @@ class ModrinthArtifactRepository :
             .map(::ModrinthModArtifactRequest)
             .map { ModrinthModParentInfo(it, listOf(ModrinthRepositorySettings)) }
 
-        ModrinthModArtifactMetadata(
+        return ModrinthModArtifactMetadata(
             request.descriptor,
             resource,
             parents
@@ -201,10 +180,9 @@ object Modrinth : RepositoryFactory<ModrinthRepositorySettings, ModrinthArtifact
 
 class ModrinthFabricModDependencyResolver(
     classLoader: ClassLoader
-) :
-    DependencyResolver<ModrinthModDescriptor, ModrinthModArtifactRequest, FabricModNode<ModrinthModDescriptor>, ModrinthRepositorySettings, ModrinthModArtifactMetadata>(
-        classLoader
-    ) {
+) : DependencyResolver<ModrinthModDescriptor, ModrinthModArtifactRequest, FabricModNode<ModrinthModDescriptor>, ModrinthRepositorySettings, ModrinthModArtifactMetadata>(
+    classLoader
+) {
     override fun constructNode(
         descriptor: ModrinthModDescriptor,
         handle: ArchiveHandle?,
@@ -218,17 +196,17 @@ class ModrinthFabricModDependencyResolver(
         return resource
     }
 
-    override val context: ResolutionContext<ModrinthRepositorySettings, ModrinthModArtifactRequest, ModrinthModArtifactMetadata> =Modrinth.createContext()
-
     override val metadataType: Class<ModrinthModArtifactMetadata> = ModrinthModArtifactMetadata::class.java
+    override val factory: RepositoryFactory<ModrinthRepositorySettings, ArtifactRepository<ModrinthRepositorySettings, ModrinthModArtifactRequest, ModrinthModArtifactMetadata>>
+        get() = Modrinth
     override val name: String = "modrinth-fabric-mod"
 
     override fun load(
         data: ArchiveData<ModrinthModDescriptor, CachedArchiveResource>,
         accessTree: ArchiveAccessTree,
         helper: ResolutionHelper
-    ): Job<FabricModNode<ModrinthModDescriptor>> = job {
-        FabricModNode(
+    ): FabricModNode<ModrinthModDescriptor> {
+        return FabricModNode(
             data.resources["jar.jar"]?.path,
             data.descriptor,
             accessTree
@@ -238,11 +216,11 @@ class ModrinthFabricModDependencyResolver(
     override fun deserializeDescriptor(
         descriptor: Map<String, String>,
         trace: ArchiveTrace
-    ): Result<ModrinthModDescriptor> = result {
+    ): ModrinthModDescriptor {
         val project = descriptor.requireKeyInDescriptor("projectId") { trace }
         val version = descriptor.requireKeyInDescriptor("versionId") { trace }
 
-        ModrinthModDescriptor(project, version)
+        return ModrinthModDescriptor(project, version)
     }
 
     override fun pathForDescriptor(

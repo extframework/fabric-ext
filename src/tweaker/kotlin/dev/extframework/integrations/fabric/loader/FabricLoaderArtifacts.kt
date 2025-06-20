@@ -1,20 +1,15 @@
 package dev.extframework.integrations.fabric.loader
 
 import com.durganmcbroom.artifact.resolver.*
-import com.durganmcbroom.artifact.resolver.simple.maven.*
-import com.durganmcbroom.jobs.Job
-import com.durganmcbroom.jobs.async.AsyncJob
-import com.durganmcbroom.jobs.async.asyncJob
-import com.durganmcbroom.jobs.job
-import com.durganmcbroom.resources.*
+import com.durganmcbroom.artifact.resolver.simple.maven.SimpleMavenDescriptor
+import com.durganmcbroom.artifact.resolver.simple.maven.SimpleMavenRepositorySettings
+import com.durganmcbroom.resources.Resource
+import com.durganmcbroom.resources.toByteArray
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties
 import com.fasterxml.jackson.annotation.JsonProperty
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.kotlin.KotlinModule
 import com.fasterxml.jackson.module.kotlin.readValue
-import dev.extframework.common.util.Hex
-import java.net.URI
-import java.net.URL
 
 @JsonIgnoreProperties(ignoreUnknown = true)
 data class FabricInstallerMetadata(
@@ -71,21 +66,20 @@ class FLArtifactRepository(override val settings: SimpleMavenRepositorySettings)
         KotlinModule.Builder().build()
     )
 
-    override fun get(request: FLArtifactRequest): AsyncJob<FLArtifactMetadata> {
+    override suspend fun get(request: FLArtifactRequest): FLArtifactMetadata {
         val desc by request::descriptor
 
         // julian podzilni
-        return asyncJob() {
-            val installerMetadataResource =
-                settings.layout.resourceOf("net.fabricmc", "fabric-loader", desc.version, null, "json")
-            val installerMetadata = mapper.readValue<FabricInstallerMetadata>(installerMetadataResource.open().toByteArray())
+        val installerMetadataResource =
+            settings.layout.resourceOf("net.fabricmc", "fabric-loader", desc.version, null, "json")
+        val installerMetadata =
+            mapper.readValue<FabricInstallerMetadata>(installerMetadataResource.open().toByteArray())
 
-            FLArtifactMetadata(
-                desc,
-                settings.layout.resourceOf("net.fabricmc", "fabric-loader", desc.version, null, "jar"),
-                installerMetadata
-            )
-        }
+        return FLArtifactMetadata(
+            desc,
+            settings.layout.resourceOf("net.fabricmc", "fabric-loader", desc.version, null, "jar"),
+            installerMetadata
+        )
     }
 }
 
@@ -123,7 +117,7 @@ class FLLibArtifactRepository :
     override val settings: FLLibRepositorySettings = FLLibRepositorySettings
 
 
-    override fun get(request: FLLibArtifactRequest): AsyncJob<FLLibArtifactMetadata> = asyncJob {
+    override suspend fun get(request: FLLibArtifactRequest): FLLibArtifactMetadata {
         val repository = SimpleMavenRepositorySettings.default(url = request.lib.url)
 
         val descriptor = SimpleMavenDescriptor.parseDescription(request.lib.name)!!
@@ -136,7 +130,7 @@ class FLLibArtifactRepository :
             "jar"
         )
 
-        FLLibArtifactMetadata(
+        return FLLibArtifactMetadata(
             request.descriptor,
             resource
         )

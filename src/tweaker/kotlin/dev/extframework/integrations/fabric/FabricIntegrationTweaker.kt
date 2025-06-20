@@ -3,9 +3,6 @@ package dev.extframework.integrations.fabric
 import com.durganmcbroom.artifact.resolver.simple.maven.SimpleMavenArtifactRequest
 import com.durganmcbroom.artifact.resolver.simple.maven.SimpleMavenDescriptor
 import com.durganmcbroom.artifact.resolver.simple.maven.SimpleMavenRepositorySettings
-import com.durganmcbroom.jobs.Job
-import com.durganmcbroom.jobs.JobName
-import com.durganmcbroom.jobs.job
 import dev.extframework.boot.dependency.DependencyResolverProvider
 import dev.extframework.boot.loader.MutableClassLoader
 import dev.extframework.common.util.resolve
@@ -20,7 +17,9 @@ import dev.extframework.integrations.fabric.loader.FabricLoaderDependencyResolve
 import dev.extframework.integrations.fabric.mixin.EntrypointMixinAgent
 import dev.extframework.integrations.fabric.mixin.SpongeMixinAgent
 import dev.extframework.tooling.api.ExtensionLoader
-import dev.extframework.tooling.api.environment.*
+import dev.extframework.tooling.api.environment.ExtensionEnvironment
+import dev.extframework.tooling.api.environment.dependencyTypesAttrKey
+import dev.extframework.tooling.api.environment.wrkDirAttrKey
 import dev.extframework.tooling.api.tweaker.EnvironmentTweaker
 import java.nio.file.Path
 
@@ -30,7 +29,7 @@ val fabricRepository = SimpleMavenRepositorySettings.default(
 )
 
 class FabricIntegrationTweaker : EnvironmentTweaker {
-    override fun tweak(environment: ExtensionEnvironment): Job<Unit> = job(JobName("Tweak the fabric environment")) {
+    override fun tweak(environment: ExtensionEnvironment) {
         // While capturing the environment of a tweaker is not good practice, we do it here.
         // TODO replace with just capturing environmental variables we need
         tweakerEnv = environment

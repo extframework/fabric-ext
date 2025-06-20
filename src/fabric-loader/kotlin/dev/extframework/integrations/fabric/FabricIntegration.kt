@@ -17,7 +17,6 @@ import dev.extframework.common.util.make
 import dev.extframework.common.util.readInputStream
 import dev.extframework.common.util.resolve
 import dev.extframework.core.app.TargetLinker
-import dev.extframework.core.app.api.ApplicationTarget
 import dev.extframework.core.entrypoint.Entrypoint
 import dev.extframework.core.minecraft.api.MappingNamespace
 import dev.extframework.core.minecraft.environment.mappingProvidersAttrKey
@@ -30,15 +29,14 @@ import dev.extframework.integrations.fabric.mapping.FabricMappingProvider
 import dev.extframework.integrations.fabric.mapping.mapNamespaces
 import dev.extframework.integrations.fabric.util.write
 import dev.extframework.tooling.api.ExtensionLoader
-import dev.extframework.tooling.api.environment.*
+import dev.extframework.tooling.api.environment.ExtensionEnvironment
+import dev.extframework.tooling.api.environment.wrkDirAttrKey
 import net.fabricmc.api.EnvType
-import net.fabricmc.loader.impl.FabricLoaderImpl
 import net.fabricmc.loader.impl.FormattedException
 import net.fabricmc.loader.impl.game.minecraft.MinecraftGameProvider
 import net.fabricmc.loader.impl.game.minecraft.patch.EntrypointPatch
 import net.fabricmc.loader.impl.launch.FabricLauncherBase
 import net.fabricmc.loader.impl.launch.knot.MixinServiceKnot
-import net.fabricmc.loader.impl.lib.accesswidener.AccessWidenerClassVisitor
 import net.fabricmc.loader.impl.transformer.FabricTransformer
 import net.fabricmc.loader.impl.util.FileSystemUtil
 import net.fabricmc.mappingio.format.tiny.Tiny1FileWriter
