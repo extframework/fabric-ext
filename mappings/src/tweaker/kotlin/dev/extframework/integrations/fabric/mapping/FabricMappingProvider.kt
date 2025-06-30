@@ -37,7 +37,7 @@ class FabricMappingProvider(
     }
 }
 
-internal class RawFabricMappingProvider (
+public class RawFabricMappingProvider (
     val store: DataStore<String, Resource>
 ) : MappingsProvider {
     constructor(path: Path) : this(DelegatingDataStore(IntermediaryMappingAccess(path)))

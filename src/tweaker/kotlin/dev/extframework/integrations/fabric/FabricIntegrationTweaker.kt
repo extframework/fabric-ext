@@ -11,7 +11,9 @@ import dev.extframework.core.instrument.InstrumentedApplicationTarget
 import dev.extframework.core.instrument.instrumentAgentsAttrKey
 import dev.extframework.core.minecraft.api.MinecraftAppApi
 import dev.extframework.core.minecraft.environment.mappingTargetAttrKey
+import dev.extframework.core.minecraft.environment.minecraft
 import dev.extframework.integrations.fabric.dependency.CurseMavenFabricModProvider
+import dev.extframework.integrations.fabric.dependency.ModrinthFabricModDependencyResolver
 import dev.extframework.integrations.fabric.dependency.ModrinthFabricModProvider
 import dev.extframework.integrations.fabric.loader.FabricLoaderDependencyResolverProvider
 import dev.extframework.integrations.fabric.mixin.EntrypointMixinAgent
@@ -36,25 +38,34 @@ class FabricIntegrationTweaker : EnvironmentTweaker {
 
         // Register the fabric loader dependency type (ONLY FOR THE FABRIC-INTEGRATION EXTENSION)
         val dependencyTypes = environment[dependencyTypesAttrKey].container
+        val resolvers = environment[ExtensionLoader].graph.resolvers
 
         val flDepProvider = FabricLoaderDependencyResolverProvider()
         dependencyTypes.register(
-            "fl",
             flDepProvider
         )
-        environment[ExtensionLoader].graph.registerResolver(flDepProvider.resolver.libResolver)
+        resolvers.register(flDepProvider.resolver.libResolver)
+        resolvers.register(flDepProvider.resolver)
 
+        val curseMavenProvider = CurseMavenFabricModProvider(
+            dependencyTypes["simple-maven"]!! as DependencyResolverProvider<SimpleMavenDescriptor, SimpleMavenArtifactRequest, SimpleMavenRepositorySettings>,
+        )
         dependencyTypes.register(
-            "fabric-mod:curse-maven",
-            CurseMavenFabricModProvider(
-                dependencyTypes.get("simple-maven")!! as DependencyResolverProvider<SimpleMavenDescriptor, SimpleMavenArtifactRequest, SimpleMavenRepositorySettings>,
+            curseMavenProvider
+        )
+        resolvers.register(curseMavenProvider.resolver)
+
+        val modrinthProvider = ModrinthFabricModProvider(
+            ModrinthFabricModDependencyResolver(
+                ModrinthFabricModProvider::class.java.classLoader,
+                environment.minecraft.version
             )
-        )
 
-        dependencyTypes.register(
-            "fabric-mod:modrinth",
-            ModrinthFabricModProvider()
         )
+        dependencyTypes.register(
+            modrinthProvider
+        )
+        resolvers.register(modrinthProvider.resolver)
 
         // Set the minecraft version
         minecraftVersion = environment[ApplicationTarget].node.descriptor.version
@@ -68,7 +79,7 @@ class FabricIntegrationTweaker : EnvironmentTweaker {
             }
         )
         mixinAgents.add(
-            0,
+            1,
             SpongeMixinAgent().also {
                 spongeMixinAgent = it
             }

@@ -1,5 +1,5 @@
 import dev.extframework.gradle.api.EvaluatingDependency
-import dev.extframework.gradle.common.archiveMapper
+import dev.extframework.gradle.common.*
 import dev.extframework.gradle.common.archiveMapperTiny
 import dev.extframework.gradle.common.archiveMapperTransform
 import dev.extframework.gradle.common.extFramework
@@ -14,8 +14,8 @@ plugins {
     kotlin("jvm") version "2.0.21"
 
     id("maven-publish")
-    id("dev.extframework") version "1.4"
-    id("dev.extframework.common") version "1.1"
+    id("dev.extframework") version "1.4.1"
+    id("dev.extframework.common") version "1.1.1"
 }
 
 tasks.wrapper {
@@ -23,7 +23,7 @@ tasks.wrapper {
 }
 
 group = "dev.extframework.integrations"
-version = "1.0.7-BETA"
+version = "1.0.8-BETA"
 
 val fabricLoaderVersion = "0.16.10"
 
@@ -80,7 +80,7 @@ extension {
         gradle {
             entrypointClass = "dev.extframework.integrations.fabric.FabricGradleEntrypoint"
             dependencies {
-                implementation("dev.extframework:gradle-api:1.1-BETA")
+                implementation(gradlePluginApi())
                 implementation(gradleApi())
             }
         }
@@ -110,10 +110,8 @@ extension {
 
 dependencies {
     "fabric-loaderImplementation"("io.github.llamalad7:mixinextras-fabric:0.4.1")
-
     "fabric-loaderImplementation"("net.fabricmc:tiny-remapper:0.8.2")
     "fabric-loaderImplementation"("net.fabricmc:fabric-loader:$fabricLoaderVersion")
-//    implementation("cpw.mods:modlauncher:10.1.9")
     "fabric-loaderImplementation"("net.fabricmc:sponge-mixin:0.12.5+mixin.0.8.5") {
         exclude(group = "org.ow2.asm")
     }
@@ -121,6 +119,12 @@ dependencies {
         isTransitive = false
     }
 
+    testImplementation(sourceSets["gradle"].output)
+    testImplementation(sourceSets["tweaker"].output)
+//    testImplementation(boot())
+//    testImplementation(toolingApi())
+//    println(extLoader())
+//    testImplementation(extLoader())
     testImplementation(kotlin("test"))
 }
 
@@ -195,5 +199,6 @@ allprojects {
         maven {
             url = uri("https://repo.extframework.dev/registry")
         }
+        mavenLocal()
     }
 }

@@ -7,7 +7,7 @@ import dev.extframework.integrations.fabric.fabricRepository
 internal class FabricLoaderDependencyResolverProvider :
     DependencyResolverProvider<FLDescriptor, FLArtifactRequest, SimpleMavenRepositorySettings> {
     override val resolver = FLDependencyResolver()
-    override val name: String = "fl"
+    override val id: String = "fl"
     override fun parseRequest(request: Map<String, String>): FLArtifactRequest? {
         if (request.keys != setOf("fl-version")) return null
 

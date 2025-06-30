@@ -55,6 +55,7 @@ class FabricIntegration : Entrypoint() {
     override fun init() {
         val startTime = System.currentTimeMillis()
 
+        println("Fabric integration")
         val mappingsProviders = FabricIntegrationTweaker.tweakerEnv[mappingProvidersAttrKey]
 
         val mappingTarget = FabricIntegrationTweaker.tweakerEnv[mappingTargetAttrKey].value
@@ -91,7 +92,9 @@ class FabricIntegration : Entrypoint() {
 
         System.setProperty(
             net.fabricmc.loader.impl.util.SystemProperties.ADD_MODS,
-            archiveGraph.nodes().filterIsInstance<FabricModNode<*>>()
+            archiveGraph.nodes
+                .map { it.value.value }
+                .filterIsInstance<FabricModNode<*>>()
                 .joinToString(separator = File.pathSeparator) { it.path.toString() }
         )
 
@@ -119,7 +122,7 @@ class FabricIntegration : Entrypoint() {
             val newTargetRef = Archives.find(targetLocation, Archives.Finders.ZIP_FINDER)
 
             // At this point the target archive should already be in the correctly mapped namespace
-            val mappings = newMappingsGraph(mappingsProviders).findShortest(
+            val mappings = newMappingsGraph(mappingsProviders.toList()).findShortest(
                 FabricMappingProvider.INTERMEDIARY_NAMESPACE,
                 mappingTarget.identifier,
             ).forIdentifier(target.version)
@@ -186,7 +189,7 @@ class FabricIntegration : Entrypoint() {
                         name.replace('.', '/') + ".class"
                     )
                     buffer?.readInputStream()?.let(::ClassReader)?.let { r ->
-                        ClassNode().also { r.accept(it, 0) }
+                        ClassNode().also { r.accept(it, ClassReader.EXPAND_FRAMES) }
                     }
                 }
             ) { node: ClassNode ->
@@ -269,15 +272,18 @@ class FabricIntegration : Entrypoint() {
 
         FabricIntegrationTweaker.tweakerEnv[TargetLinker].addExtensionClasses(object : ClassProvider {
             override val packages: Set<String> =
-                archiveGraph.nodes()
+                archiveGraph.nodes
+                    .map { it.value.value }
                     .filterIsInstance<FLNode>()
                     .flatMapTo(HashSet()) {
                         it.packages
-                    } + archiveGraph.nodes()
+                    } + archiveGraph.nodes
+                    .map { it.value.value }
                     .filterIsInstance<FLLibNode>()
                     .flatMapTo(HashSet()) {
                         it.packages
-                    } + archiveGraph.nodes()
+                    } + archiveGraph.nodes
+                    .map { it.value.value }
                     .filterIsInstance<FabricModNode<*>>()
                     .flatMapTo(HashSet()) {
                         it.packages

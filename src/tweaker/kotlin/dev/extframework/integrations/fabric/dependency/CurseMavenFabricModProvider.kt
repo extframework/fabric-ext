@@ -1,26 +1,24 @@
 package dev.extframework.integrations.fabric.dependency
 
-import com.durganmcbroom.artifact.resolver.Artifact
 import com.durganmcbroom.artifact.resolver.ArtifactRepository
 import com.durganmcbroom.artifact.resolver.RepositoryFactory
-import com.durganmcbroom.artifact.resolver.ResolutionContext
-import com.durganmcbroom.artifact.resolver.createContext
 import com.durganmcbroom.artifact.resolver.simple.maven.*
 import com.durganmcbroom.resources.Resource
 import com.durganmcbroom.resources.ResourceAlgorithm
 import dev.extframework.archives.ArchiveHandle
-import dev.extframework.boot.archive.*
+import dev.extframework.boot.archive.ArchiveAccessTree
+import dev.extframework.boot.archive.ArchiveData
+import dev.extframework.boot.archive.CachedArchiveResource
+import dev.extframework.boot.archive.ResolutionHelper
 import dev.extframework.boot.dependency.DependencyResolver
 import dev.extframework.boot.dependency.DependencyResolverProvider
 import dev.extframework.boot.maven.MavenLikeResolver
-import dev.extframework.boot.monad.Tagged
-import dev.extframework.boot.monad.Tree
 import dev.extframework.boot.util.typeOf
 
 internal class CurseMavenFabricModProvider(
     mavenProvider: DependencyResolverProvider<SimpleMavenDescriptor, SimpleMavenArtifactRequest, SimpleMavenRepositorySettings>
 ) : DependencyResolverProvider<SimpleMavenDescriptor, SimpleMavenArtifactRequest, SimpleMavenRepositorySettings> by mavenProvider {
-    override val name: String = "fabric-mod:curse-maven"
+    override val id: String = "fabric-mod:curse-maven"
     override val resolver: DependencyResolver<SimpleMavenDescriptor, SimpleMavenArtifactRequest, FabricModNode<SimpleMavenDescriptor>, SimpleMavenRepositorySettings, *> =
         CurseMavenFabricModDependencyResolver(
             this::class.java.classLoader // Unused, so it doesnt matter
@@ -80,7 +78,7 @@ internal class CurseMavenFabricModDependencyResolver(
     override val metadataType: Class<SimpleMavenArtifactMetadata> = SimpleMavenArtifactMetadata::class.java
     override val factory: RepositoryFactory<SimpleMavenRepositorySettings, ArtifactRepository<SimpleMavenRepositorySettings, SimpleMavenArtifactRequest, SimpleMavenArtifactMetadata>>
         get() = SimpleMaven
-    override val name: String = "curse-fabric-mod"
+    override val id: String = "curse-fabric-mod"
 
     override fun constructNode(
         descriptor: SimpleMavenDescriptor,

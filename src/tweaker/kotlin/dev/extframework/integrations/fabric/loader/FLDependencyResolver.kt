@@ -58,7 +58,7 @@ class FLDependencyResolver private constructor(
     resolutionProvider = resolutionProvider
 ) {
     override val metadataType: Class<FLArtifactMetadata> = FLArtifactMetadata::class.java
-    override val name: String = "fl"
+    override val id: String = "fl"
     internal val libResolver = FLLibDependencyResolver(resolutionProvider)
     override val apiVersion: Int = 2
     override val factory: RepositoryFactory<SimpleMavenRepositorySettings, ArtifactRepository<SimpleMavenRepositorySettings, FLArtifactRequest, FLArtifactMetadata>>
@@ -133,7 +133,7 @@ class FLLibDependencyResolver(
     resolutionProvider = resolutionProvider
 ) {
     override val metadataType: Class<FLLibArtifactMetadata> = FLLibArtifactMetadata::class.java
-    override val name: String = "fllib"
+    override val id: String = "fllib"
     override val apiVersion: Int = 2
     override val factory: RepositoryFactory<FLLibRepositorySettings, ArtifactRepository<FLLibRepositorySettings, FLLibArtifactRequest, FLLibArtifactMetadata>>
         get() = FLLibRepositoryFactory

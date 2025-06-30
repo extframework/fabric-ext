@@ -4,7 +4,7 @@ import dev.extframework.gradle.publish.ExtensionPublication
 
 
 group = "dev.extframework.integrations"
-version = "1.0.3-BETA"
+version = "1.0.4-BETA"
 
 extension {
     partitions {

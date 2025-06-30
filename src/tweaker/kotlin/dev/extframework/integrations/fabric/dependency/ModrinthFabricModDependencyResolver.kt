@@ -13,12 +13,16 @@ import dev.extframework.boot.archive.*
 import dev.extframework.boot.dependency.DependencyNode
 import dev.extframework.boot.dependency.DependencyResolver
 import dev.extframework.boot.dependency.DependencyResolverProvider
+import dev.extframework.boot.monad.Either
+import dev.extframework.boot.monad.Tree
+import dev.extframework.boot.util.mapAsync
 import dev.extframework.boot.util.requireKeyInDescriptor
 import dev.extframework.common.util.Hex
-import dev.extframework.integrations.fabric.FabricIntegrationTweaker
+import dev.extframework.common.util.copyTo
+import kotlinx.coroutines.awaitAll
 import java.net.URI
-import java.net.URISyntaxException
 import java.net.URLEncoder
+import java.nio.file.Files
 import java.nio.file.Path
 import kotlin.io.path.Path
 
@@ -93,10 +97,12 @@ class ModrinthModArtifactMetadata(
 
 const val MODRINTH_VERSION_ENDPOINT = "https://api.modrinth.com/v2/version/"
 
-class ModrinthArtifactRepository :
-    ArtifactRepository<ModrinthRepositorySettings, ModrinthModArtifactRequest, ModrinthModArtifactMetadata> {
+class ModrinthArtifactRepository(
+    val mcVersion: String,
     override val factory: RepositoryFactory<ModrinthRepositorySettings, ArtifactRepository<ModrinthRepositorySettings, ModrinthModArtifactRequest, ModrinthModArtifactMetadata>>
-        get() = Modrinth
+
+) :
+    ArtifactRepository<ModrinthRepositorySettings, ModrinthModArtifactRequest, ModrinthModArtifactMetadata> {
     override val name: String = "modrinth"
     override val settings: ModrinthRepositorySettings = ModrinthRepositorySettings
     private val mapper = JsonMapper.builder()
@@ -142,12 +148,14 @@ class ModrinthArtifactRepository :
             .filter { it.dependencyType == "required" }
             .map {
                 val versionId = it.versionId ?: run {
+                    val uri = URI.create(
+                        "https://api.modrinth.com/v2/project/${it.projectId}/version?" +
+                                "loaders=${encoded("[\"fabric\"]")}" +
+                                "&game_versions=${encoded("[\"${this.mcVersion}\"]")}",
+                    )
+
                     val versionsResponse =
-                        URI.create(
-                            "https://api.modrinth.com/v2/project/${it.projectId}/version?" +
-                                    "loaders=${encoded("[\"fabric\"]")}" +
-                                    "&game_versions=${encoded("[\"${FabricIntegrationTweaker.minecraftVersion}\"]")}",
-                        ).toURL().toResource().open().toByteArray()
+                        uri.toURL().toResource().open().toByteArray()
 
                     val response = mapper.readValue<List<ModrinthProjectVersionListing>>(versionsResponse)
 
@@ -169,17 +177,19 @@ class ModrinthArtifactRepository :
             parents
         )
     }
-
 }
 
-object Modrinth : RepositoryFactory<ModrinthRepositorySettings, ModrinthArtifactRepository> {
+class Modrinth(
+    val mcVersion: String,
+) : RepositoryFactory<ModrinthRepositorySettings, ModrinthArtifactRepository> {
     override fun createNew(settings: ModrinthRepositorySettings): ModrinthArtifactRepository {
-        return ModrinthArtifactRepository()
+        return ModrinthArtifactRepository(mcVersion, this)
     }
 }
 
 class ModrinthFabricModDependencyResolver(
-    classLoader: ClassLoader
+    classLoader: ClassLoader,
+    mcVersion: String
 ) : DependencyResolver<ModrinthModDescriptor, ModrinthModArtifactRequest, FabricModNode<ModrinthModDescriptor>, ModrinthRepositorySettings, ModrinthModArtifactMetadata>(
     classLoader
 ) {
@@ -192,14 +202,36 @@ class ModrinthFabricModDependencyResolver(
         throw UnsupportedOperationException()
     }
 
-    override suspend fun ModrinthModArtifactMetadata.resource(): Resource? {
+    override suspend fun cache(
+        metadata: ModrinthModArtifactMetadata,
+        parents: List<Tree<Either<ModrinthModArtifactMetadata, TaggedIArchive>>>,
+        helper: CacheHelper<ModrinthModDescriptor>
+    ): Tree<TaggedIArchive> {
+        val jar = Files.createTempFile("fabric-mod", ".jar")
+        metadata.resource() copyTo jar
+
+        helper.withResource("jar.jar", metadata.resource())
+
+        return helper.newData(
+            metadata.descriptor,
+            parents.mapAsync {
+                helper.cache(
+                    it, this,
+                )
+            }.awaitAll()
+        )
+    }
+
+    override suspend fun ModrinthModArtifactMetadata.resource(): Resource {
         return resource
     }
 
+    override val apiVersion: Int = 1
     override val metadataType: Class<ModrinthModArtifactMetadata> = ModrinthModArtifactMetadata::class.java
-    override val factory: RepositoryFactory<ModrinthRepositorySettings, ArtifactRepository<ModrinthRepositorySettings, ModrinthModArtifactRequest, ModrinthModArtifactMetadata>>
-        get() = Modrinth
-    override val name: String = "modrinth-fabric-mod"
+    override val factory: RepositoryFactory<ModrinthRepositorySettings, ArtifactRepository<ModrinthRepositorySettings, ModrinthModArtifactRequest, ModrinthModArtifactMetadata>> = Modrinth(
+        mcVersion
+    )
+    override val id: String = "modrinth-fabric-mod"
 
     override fun load(
         data: ArchiveData<ModrinthModDescriptor, CachedArchiveResource>,
@@ -244,11 +276,12 @@ class ModrinthFabricModDependencyResolver(
     }
 }
 
-internal class ModrinthFabricModProvider :
+class ModrinthFabricModProvider(
+    override val resolver: DependencyResolver<ModrinthModDescriptor, ModrinthModArtifactRequest, out DependencyNode<ModrinthModDescriptor>, ModrinthRepositorySettings, *>
+) :
     DependencyResolverProvider<ModrinthModDescriptor, ModrinthModArtifactRequest, ModrinthRepositorySettings> {
-    override val name: String = "fabric-mod:modrinth"
-    override val resolver: DependencyResolver<ModrinthModDescriptor, ModrinthModArtifactRequest, out DependencyNode<ModrinthModDescriptor>, ModrinthRepositorySettings, *> =
-        ModrinthFabricModDependencyResolver(this::class.java.classLoader)
+    override val id: String = "fabric-mod:modrinth"
+
 
     override fun parseRequest(request: Map<String, String>): ModrinthModArtifactRequest? {
         val projectId = request["projectId"] ?: return null
