@@ -1,28 +1,25 @@
-import dev.extframework.gradle.api.EvaluatingDependency
-import dev.extframework.gradle.common.*
-import dev.extframework.gradle.common.archiveMapperTiny
-import dev.extframework.gradle.common.archiveMapperTransform
-import dev.extframework.gradle.common.extFramework
-import dev.extframework.gradle.publish.ExtensionPublication
-import dev.extframework.minecraft.MojangNamespaces
-import dev.extframework.minecraft.minecraft
-import dev.extframework.minecraft.task.LaunchMinecraft
-import dev.extframework.tooling.api.extension.ExtensionRepository
+import com.kaolinmc.kiln.api.EvaluatingDependency
+import com.kaolinmc.gradle.common.*
+import com.kaolinmc.kiln.publish.ExtensionPublication
+import com.kaolinmc.minecraft.MojangNamespaces
+import com.kaolinmc.minecraft.minecraft
+import com.kaolinmc.minecraft.task.LaunchMinecraft
+import com.kaolinmc.tooling.api.extension.ExtensionRepository
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
 plugins {
     kotlin("jvm") version "2.0.21"
 
     id("maven-publish")
-    id("dev.extframework") version "1.4.1"
-    id("dev.extframework.common") version "1.1.1"
+    id("kaolin.kiln") version "0.1"
+    id("com.kaolinmc.common") version "0.1"
 }
 
 tasks.wrapper {
     gradleVersion = "8.6-rc-1"
 }
 
-group = "dev.extframework.integrations"
+group = "com.kaolinmc.integrations"
 version = "1.0.8-BETA"
 
 val fabricLoaderVersion = "0.16.10"
@@ -70,7 +67,7 @@ extension {
 
     partitions {
         tweaker {
-            tweakerClass = "dev.extframework.integrations.fabric.FabricIntegrationTweaker"
+            tweakerClass = "com.kaolinmc.integrations.fabric.FabricIntegrationTweaker"
             dependencies {
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.3")
 
@@ -78,7 +75,7 @@ extension {
             }
         }
         gradle {
-            entrypointClass = "dev.extframework.integrations.fabric.FabricGradleEntrypoint"
+            entrypointClass = "com.kaolinmc.integrations.fabric.FabricGradleEntrypoint"
             dependencies {
                 implementation(gradlePluginApi())
                 implementation(gradleApi())
@@ -86,7 +83,7 @@ extension {
         }
         minecraft("fabric-loader") {
             mappings = MojangNamespaces.obfuscated
-            entrypoint = "dev.extframework.integrations.fabric.FabricIntegration"
+            entrypoint = "com.kaolinmc.integrations.fabric.FabricIntegration"
             dependencies {
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.3")
 
@@ -102,8 +99,8 @@ extension {
 
     metadata {
         name = "Fabric Integration"
-        description = "An extension that brings the fabric ecosystem to extframework"
-        developers.add("extframework")
+        description = "An extension that brings the fabric ecosystem to Kaolin"
+        developers.add("kaolin")
         app = "minecraft"
     }
 }
@@ -134,7 +131,7 @@ publishing {
     }
     repositories {
         maven {
-            url = uri("https://repo.extframework.dev")
+            url = uri("https://repo.kaolinmc.com")
             credentials {
                 password = properties["creds.ext.key"] as? String
             }
@@ -181,12 +178,12 @@ kotlin {
 allprojects {
     apply(plugin = "maven-publish")
     apply(plugin = "org.jetbrains.kotlin.jvm")
-    apply(plugin = "dev.extframework")
-    apply(plugin = "dev.extframework.common")
+    apply(plugin = "kaolin.kiln")
+    apply(plugin = "com.kaolinmc.common")
 
     repositories {
         mavenCentral()
-        extFramework()
+        kaolin()
         maven {
             url = uri("https://maven.fabricmc.net/")
         }
@@ -195,9 +192,6 @@ allprojects {
         }
         maven {
             url = uri("https://libraries.minecraft.net")
-        }
-        maven {
-            url = uri("https://repo.extframework.dev/registry")
         }
         mavenLocal()
     }

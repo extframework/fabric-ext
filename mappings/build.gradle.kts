@@ -1,9 +1,9 @@
-import dev.extframework.gradle.common.archiveMapper
-import dev.extframework.gradle.common.archiveMapperTiny
-import dev.extframework.gradle.publish.ExtensionPublication
+import com.kaolinmc.gradle.common.archiveMapper
+import com.kaolinmc.gradle.common.archiveMapperTiny
+import com.kaolinmc.kiln.publish.ExtensionPublication
 
 
-group = "dev.extframework.integrations"
+group = "com.kaolinmc.integrations"
 version = "1.0.4-BETA"
 
 extension {
@@ -13,13 +13,13 @@ extension {
                 implementation(archiveMapper())
                 implementation(archiveMapperTiny())
             }
-            tweakerClass = "dev.extframework.integrations.fabric.mapping.FabricMappingsTweaker"
+            tweakerClass = "com.kaolinmc.integrations.fabric.mapping.FabricMappingsTweaker"
         }
     }
     metadata {
         name = "Fabric Mappings"
-        description = "An extension that brings Fabric Intermediary mappings to extframework"
-        developers.add("extframework")
+        description = "An extension that brings Fabric Intermediary mappings to Kaolin"
+        developers.add("kaolin")
         app = "minecraft"
     }
 }
@@ -30,7 +30,7 @@ publishing {
     }
     repositories {
         maven {
-            url = uri("https://repo.extframework.dev")
+            url = uri("https://repo.kaolinmc.com")
             credentials {
                 password = properties["creds.ext.key"] as? String
             }
